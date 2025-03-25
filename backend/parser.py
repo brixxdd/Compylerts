@@ -7,7 +7,7 @@ class SyntaxError(Exception):
     def __init__(self, message: str, token: Token):
         self.message = message
         self.token = token
-        super().__init__(f"Syntax Error at line {token.position.line}, column {token.position.column}: {message}")
+        super().__init__(f"Error de sintaxis en línea {token.position.line}, columna {token.position.column}: {message}")
 
 class Parser:
     def __init__(self, tokens: List[Token]):
@@ -92,27 +92,16 @@ class Parser:
         
         self.consume(TokenType.DELIMITER, "Expect ':' before function body.")
         
-        # Function body - collect statements until we find a blank line or a non-indented line
+        # Function body - collect only the return statement
         body = []
         
         # En un analizador real, aquí verificaríamos la indentación
         # Como simplificación, consideraremos que el cuerpo de la función incluye
-        # todas las declaraciones hasta encontrar una línea en blanco (representada por un comentario vacío)
-        # o hasta encontrar otra declaración de función o clase
-        
-        # Recopilamos solo las dos primeras declaraciones (if y return)
-        # Esta es una simplificación extrema, pero funcionará para nuestro ejemplo
+        # solo la primera declaración (return)
         if not self.is_at_end():
-            # Primera declaración (if)
             stmt = self.statement()
             if stmt:
                 body.append(stmt)
-                
-            # Segunda declaración (return)
-            if not self.is_at_end() and not self.check_keyword("def") and not self.check_keyword("class"):
-                stmt = self.statement()
-                if stmt:
-                    body.append(stmt)
         
         return FunctionDecl(name, parameters, return_type, body)
 
@@ -324,7 +313,11 @@ class Parser:
                     while True:
                         arguments.append(self.expression())
                         
-                        if not self.match_token(TokenType.DELIMITER, ","):
+                        if self.match_token(TokenType.DELIMITER, ","):
+                            # Verificar si hay otro argumento después de la coma
+                            if self.check_token(TokenType.DELIMITER, ")"):
+                                raise self.error(self.peek(), "Expected argument after comma, got ')'")
+                        else:
                             break
                 
                 self.consume(TokenType.DELIMITER, "Expect ')' after arguments.")
@@ -388,6 +381,38 @@ class Parser:
 
     def error(self, token: Token, message: str) -> SyntaxError:
         """Create a syntax error"""
+        # Traducir mensajes comunes
+        if message == "Expected argument after comma, got ')'":
+            message = "Se esperaba un argumento después de la coma, se encontró ')'"
+        elif message == "Invalid assignment target.":
+            message = "Objetivo de asignación inválido."
+        elif message == "Expect expression.":
+            message = "Se esperaba una expresión."
+        elif message == "Expect ')' after expression.":
+            message = "Se esperaba ')' después de la expresión."
+        elif message == "Expect ')' after arguments.":
+            message = "Se esperaba ')' después de los argumentos."
+        elif message == "Expect ':' after if condition.":
+            message = "Se esperaba ':' después de la condición if."
+        elif message == "Expect ':' after 'else'.":
+            message = "Se esperaba ':' después de 'else'."
+        elif message == "Expect ':' after while condition.":
+            message = "Se esperaba ':' después de la condición while."
+        elif message == "Expect ':' before function body.":
+            message = "Se esperaba ':' antes del cuerpo de la función."
+        elif message == "Expect '(' after function name.":
+            message = "Se esperaba '(' después del nombre de la función."
+        elif message == "Expect function name.":
+            message = "Se esperaba el nombre de la función."
+        elif message == "Expect parameter name.":
+            message = "Se esperaba el nombre del parámetro."
+        elif message == "Expect type hint after ':'.":
+            message = "Se esperaba un tipo después de ':'."
+        elif message == "Expect return type after '->'.":
+            message = "Se esperaba un tipo de retorno después de '->'."
+        elif message.startswith("Expect"):
+            message = message.replace("Expect", "Se esperaba")
+            
         return SyntaxError(message, token)
 
     def is_at_end(self) -> bool:

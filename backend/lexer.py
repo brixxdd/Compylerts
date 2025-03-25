@@ -81,10 +81,114 @@ class LexicalAnalyzer:
         '->', '=>', ':=',  # Añadimos la flecha para type hints
     }
     TYPO_DICTIONARY = {
+        # Errores comunes en inglés
         'pritn': 'print',
         'lenght': 'length',
         'defien': 'define',
-        'retrun': 'return'
+        'retrun': 'return',
+        'functoin': 'function',
+        'whiel': 'while',
+        'ture': 'True',
+        'flase': 'False',
+        'improt': 'import',
+        'fro': 'for',
+        'fi': 'if',
+        'esle': 'else',
+        'rnage': 'range',
+        'calss': 'class',
+        'dfe': 'def',
+        'slef': 'self',
+        'yeild': 'yield',
+        'finaly': 'finally',
+        'excpet': 'except',
+        'raisee': 'raise',
+        'contineu': 'continue',
+        'brak': 'break',
+        'imoprt': 'import',
+        'wirte': 'write',
+        'raed': 'read',
+        'appned': 'append',
+        'inster': 'insert',
+        'remvoe': 'remove',
+        'dictonary': 'dictionary',
+        'lisst': 'list',
+        'sett': 'set',
+        'touple': 'tuple',
+        'booleen': 'boolean',
+        'intger': 'integer',
+        'floot': 'float',
+        'strig': 'string',
+        'globel': 'global',
+        'locla': 'local',
+        'nonlocla': 'nonlocal',
+        'lamda': 'lambda',
+        'asert': 'assert',
+        'delte': 'delete',
+        'tyr': 'try',
+        'wiht': 'with',
+        'yiled': 'yield',
+        'passs': 'pass',
+        'contniue': 'continue',
+        'imprt': 'import',
+        'fromm': 'from',
+        'ass': 'as',
+        'iff': 'if',
+        'eliif': 'elif',
+        'ellse': 'else',
+        'whille': 'while',
+        'forr': 'for',
+        'inn': 'in',
+        'iss': 'is',
+        'nott': 'not',
+        'andd': 'and',
+        'orr': 'or',
+        
+        # Errores comunes en español
+        'imprimir': 'print',
+        'si': 'if',
+        'sino': 'else',
+        'para': 'for',
+        'mientras': 'while',
+        'retornar': 'return',
+        'definir': 'def',
+        'clase': 'class',
+        'verdadero': 'True',
+        'falso': 'False',
+        'importar': 'import',
+        'rango': 'range',
+        'escribir': 'write',
+        'leer': 'read',
+        'funcion': 'function',
+        'variable': 'var',
+        'entero': 'int',
+        'flotante': 'float',
+        'cadena': 'string',
+        'booleano': 'bool',
+        'lista': 'list',
+        'diccionario': 'dict',
+        'tupla': 'tuple',
+        'conjunto': 'set',
+        'nulo': 'None',
+        'intentar': 'try',
+        'excepto': 'except',
+        'finalmente': 'finally',
+        'con': 'with',
+        'como': 'as',
+        'desde': 'from',
+        'continuar': 'continue',
+        'romper': 'break',
+        'pasar': 'pass',
+        'global': 'global',
+        'local': 'local',
+        'nolocal': 'nonlocal',
+        'lambda': 'lambda',
+        'afirmar': 'assert',
+        'eliminar': 'del',
+        'producir': 'yield',
+        'retorno': 'return',
+        'imprima': 'print',
+        'defina': 'def',
+        'retorne': 'return'
     }
 
     def __init__(self):
@@ -101,6 +205,7 @@ class LexicalAnalyzer:
         current_pos = Position(1, 1, 0)
         current_lexeme = ""
         state = 'START'
+        string_start_pos = None
         
         while current_pos.index < len(source_code):
             char = source_code[current_pos.index]
@@ -119,9 +224,18 @@ class LexicalAnalyzer:
                     current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
                 
                 elif char.isalpha() or char == '_':
-                    state = 'IDENTIFIER'
-                    current_lexeme = char
-                    current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
+                    # Verificar si es una f-string
+                    if char == 'f' and current_pos.index + 1 < len(source_code) and source_code[current_pos.index + 1] in ['"', "'"]:
+                        # Es una f-string, procesarla como un string
+                        string_start_pos = current_pos
+                        current_lexeme = char
+                        current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
+                        state = 'F_STRING'
+                    else:
+                        # Es un identificador normal
+                        state = 'IDENTIFIER'
+                        current_lexeme = char
+                        current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
                 
                 elif char.isdigit():
                     state = 'NUMBER'
@@ -130,6 +244,7 @@ class LexicalAnalyzer:
                 
                 elif char in ['"', "'"]:
                     state = 'STRING'
+                    string_start_pos = current_pos
                     current_lexeme = char
                     current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
                 
@@ -203,19 +318,58 @@ class LexicalAnalyzer:
                     state = 'START'
                     current_lexeme = ""
             
-            elif state == 'STRING':
-                if char == '\n':
-                    self._add_error("Unterminated string literal", current_pos)
+            elif state == 'F_STRING':
+                # Obtener el delimitador de la cadena (comilla simple o doble)
+                quote = source_code[current_pos.index]
+                if quote not in ['"', "'"]:
+                    self._add_error(f"Expected string delimiter after 'f', got '{quote}'", current_pos)
                     state = 'START'
-                    current_lexeme = ""
-                    current_pos = Position(current_pos.line + 1, 1, current_pos.index + 1)
-                else:
+                    continue
+                
+                current_lexeme += quote
+                current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
+                
+                # Procesar el contenido de la f-string
+                while current_pos.index < len(source_code):
+                    char = source_code[current_pos.index]
                     current_lexeme += char
                     current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
-                    if char == current_lexeme[0] and len(current_lexeme) > 1:
-                        self.tokens.append(Token(TokenType.STRING, current_lexeme, current_pos))
+                    
+                    if char == quote and current_lexeme[-2] != '\\':  # Verificar que no sea una comilla escapada
+                        # Fin de la f-string
+                        self.tokens.append(Token(TokenType.STRING, current_lexeme, string_start_pos))
                         state = 'START'
                         current_lexeme = ""
+                        break
+                    
+                    if char == '\n':
+                        self._add_error("Unterminated f-string", string_start_pos)
+                        state = 'START'
+                        current_lexeme = ""
+                        current_pos = Position(current_pos.line + 1, 1, current_pos.index)
+                        break
+                
+                # Si llegamos al final del archivo sin cerrar la cadena
+                if current_pos.index >= len(source_code) and state == 'F_STRING':
+                    self._add_error("Unterminated f-string", string_start_pos)
+                    state = 'START'
+                    current_lexeme = ""
+            
+            elif state == 'STRING':
+                quote = current_lexeme[0]  # El primer carácter es la comilla que abre
+                current_lexeme += char
+                current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
+                
+                if char == quote and current_lexeme[-2] != '\\':  # Verificar que no sea una comilla escapada
+                    # Fin de la cadena
+                    self.tokens.append(Token(TokenType.STRING, current_lexeme, string_start_pos))
+                    state = 'START'
+                    current_lexeme = ""
+                elif char == '\n':
+                    self._add_error("Unterminated string literal", string_start_pos)
+                    state = 'START'
+                    current_lexeme = ""
+                    current_pos = Position(current_pos.line + 1, 1, current_pos.index)
             
             elif state == 'COMMENT':
                 if char == '\n':
@@ -242,6 +396,24 @@ class LexicalAnalyzer:
     
     def _add_error(self, message: str, position: Position):
         """Add a lexical error"""
+        # Traducir mensajes comunes al español
+        if message.startswith("Unrecognized character"):
+            char = message.split("'")[1]
+            message = f"Carácter no reconocido: '{char}'"
+        elif message.startswith("Unterminated string literal"):
+            message = "Cadena de texto sin terminar"
+        elif message.startswith("Unterminated f-string"):
+            message = "f-string sin terminar"
+        elif message.startswith("Expected string delimiter"):
+            char = message.split("'")[3]
+            message = f"Se esperaba un delimitador de cadena después de 'f', se encontró '{char}'"
+        elif message.startswith("Possible typo"):
+            parts = message.split("'")
+            if len(parts) >= 4:
+                word = parts[1]
+                suggestion = parts[3]
+                message = f"Posible error tipográfico: '{word}'. ¿Quisiste decir '{suggestion}'?"
+        
         error = {
             'message': message,
             'line': position.line,
@@ -251,15 +423,15 @@ class LexicalAnalyzer:
         
     def print_tokens(self):
         """Print all tokens with color"""
-        print(f"{Fore.CYAN}🔍 Tokens Found:{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}🔍 Tokens Encontrados:{Style.RESET_ALL}")
         for token in self.tokens:
             print(f"{token} [{token.type.value}]")
     
     def print_errors(self):
         """Print lexical errors"""
         if self.errors:
-            print(f"\n{Fore.RED}❌ Lexical Errors:{Style.RESET_ALL}")
+            print(f"\n{Fore.RED}❌ Errores Léxicos:{Style.RESET_ALL}")
             for error in self.errors:
-                print(f"Line {error['line']}, Column {error['column']}: {error['message']}")
+                print(f"Línea {error['line']}, Columna {error['column']}: {error['message']}")
         else:
-            print(f"\n{Fore.GREEN}✅ No lexical errors found{Style.RESET_ALL}")
+            print(f"\n{Fore.GREEN}✅ No se encontraron errores léxicos{Style.RESET_ALL}")
