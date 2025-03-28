@@ -67,15 +67,13 @@ class LexicalAnalyzer:
     """Advanced Lexical Analyzer with Enhanced Python Syntax Support"""
     
     # Actualizar las constantes al inicio de la clase
-    KEYWORDS = {'def', 'return', 'if', 'else', 'while', 'for', 'in', 'True', 'False', 'None', 'class'}
+    KEYWORDS = {'def', 'return', 'if', 'else', 'while', 'for', 'in', 'True', 'False', 'None', 'class', 'print', 'and', 'or', 'not'}
     TYPE_HINTS = {'int', 'str', 'float', 'bool', 'list', 'dict', 'tuple', 'set'}
     OPERATORS = {
         # Operadores aritméticos
         '+', '-', '*', '/', '//', '%', '**',
         # Operadores de comparación
         '==', '!=', '<', '>', '<=', '>=',
-        # Operadores lógicos
-        'and', 'or', 'not',
         # Operadores de asignación
         '=', '+=', '-=', '*=', '/=', '//=', '%=',
         # Operadores bit a bit
@@ -217,122 +215,142 @@ class LexicalAnalyzer:
         self.source_code = source_code
         self.tokens = []
         self.errors = []
+        self.indent_stack = [0]  # Reiniciar la pila de indentación
         current_pos = Position(1, 1, 0)
         
         lines = source_code.split('\n')
         for line_num, line in enumerate(lines, 1):
-            # Procesar indentación
+            # Calcular la indentación actual
+            indent = len(line) - len(line.lstrip())
+            current_indent_pos = Position(line_num, 1, current_pos.index)
+            
+            # Procesar indentación solo si la línea no está vacía
             if line.strip():
-                indent = self.handle_indentation(line, line_num)
+                # Comparar con el nivel de indentación actual
                 if indent > self.indent_stack[-1]:
+                    # Aumentar indentación
                     self.indent_stack.append(indent)
-                    self.tokens.append(Token(TokenType.INDENT, " " * indent, current_pos))
+                    self.tokens.append(Token(TokenType.INDENT, " " * indent, current_indent_pos))
                 elif indent < self.indent_stack[-1]:
+                    # Disminuir indentación, posiblemente varias veces
                     while indent < self.indent_stack[-1]:
                         self.indent_stack.pop()
-                        self.tokens.append(Token(TokenType.DEDENT, "", current_pos))
+                        self.tokens.append(Token(TokenType.DEDENT, "", current_indent_pos))
+                    
+                    # Verificar que la indentación coincida con algún nivel anterior
                     if indent != self.indent_stack[-1]:
                         self._add_error(
-                            f"Indentación inconsistente",
-                            Position(line_num, 1, 0)
+                            f"Indentación inconsistente: {indent} espacios no coincide con ningún nivel anterior",
+                            current_indent_pos
                         )
-
-            # Procesar el contenido de la línea
-            i = indent
-            while i < len(line):
-                char = line[i]
                 
-                # Saltar espacios en blanco
-                if char.isspace():
-                    i += 1
-                    continue
-                
-                # Procesar comentarios
-                if char == '#':
-                    comment = line[i:]
-                    self.tokens.append(Token(TokenType.COMMENT, comment, 
-                        Position(line_num, i + 1, current_pos.index + i)))
-                    break
-                
-                # Procesar strings
-                if char in '"\'':
-                    string_start = i
-                    quote = char
-                    i += 1
-                    while i < len(line) and line[i] != quote:
-                        if line[i] == '\\':
-                            i += 2
-                        else:
-                            i += 1
-                    if i >= len(line):
-                        self._add_error("String sin terminar", 
-                            Position(line_num, string_start + 1, current_pos.index + string_start))
-                    else:
-                        self.tokens.append(Token(TokenType.STRING, line[string_start:i+1], 
-                            Position(line_num, string_start + 1, current_pos.index + string_start)))
-                        i += 1
-                    continue
-                
-                # Procesar números
-                if char.isdigit():
-                    num_start = i
-                    while i < len(line) and (line[i].isdigit() or line[i] == '.'):
-                        i += 1
-                    self.tokens.append(Token(TokenType.NUMBER, line[num_start:i], 
-                        Position(line_num, num_start + 1, current_pos.index + num_start)))
-                    continue
-                
-                # Procesar identificadores y palabras clave
-                if char.isalpha() or char == '_':
-                    id_start = i
-                    while i < len(line) and (line[i].isalnum() or line[i] == '_'):
-                        i += 1
-                    word = line[id_start:i]
+                # Procesar el contenido de la línea
+                i = indent  # Comenzar después de la indentación
+                while i < len(line):
+                    char = line[i]
                     
-                    # Verificar si es una palabra clave
-                    if word in self.KEYWORDS:
-                        self.tokens.append(Token(TokenType.KEYWORD, word, 
-                            Position(line_num, id_start + 1, current_pos.index + id_start)))
-                    # Verificar si es un type hint
-                    elif word in self.TYPE_HINTS:
-                        self.tokens.append(Token(TokenType.TYPE_HINT, word, 
-                            Position(line_num, id_start + 1, current_pos.index + id_start)))
-                    # Es un identificador
-                    else:
-                        if word in self.TYPO_DICTIONARY:
+                    # Saltar espacios en blanco
+                    if char.isspace():
+                        i += 1
+                        continue
+                    
+                    # Procesar comentarios
+                    if char == '#':
+                        comment = line[i:]
+                        self.tokens.append(Token(TokenType.COMMENT, comment, 
+                            Position(line_num, i + 1, current_pos.index + i)))
+                        break
+                    
+                    # Procesar strings
+                    if char in '"\'':
+                        string_start = i
+                        quote = char
+                        i += 1
+                        while i < len(line) and line[i] != quote:
+                            if line[i] == '\\':
+                                i += 2
+                            else:
+                                i += 1
+                        if i >= len(line):
+                            self._add_error("String sin terminar", 
+                                Position(line_num, string_start + 1, current_pos.index + string_start))
+                        else:
+                            self.tokens.append(Token(TokenType.STRING, line[string_start:i+1], 
+                                Position(line_num, string_start + 1, current_pos.index + string_start)))
+                            i += 1
+                        continue
+                    
+                    # Procesar números
+                    if char.isdigit():
+                        num_start = i
+                        while i < len(line) and (line[i].isdigit() or line[i] == '.'):
+                            i += 1
+                        self.tokens.append(Token(TokenType.NUMBER, line[num_start:i], 
+                            Position(line_num, num_start + 1, current_pos.index + num_start)))
+                        continue
+                    
+                    # Procesar identificadores y palabras clave
+                    if char.isalpha() or char == '_':
+                        id_start = i
+                        while i < len(line) and (line[i].isalnum() or line[i] == '_'):
+                            i += 1
+                        word = line[id_start:i]
+                        
+                        # Verificar si el identificador contiene caracteres no ASCII
+                        if not all(ord(c) < 128 for c in word):
                             self._add_error(
-                                f"Posible error tipográfico: '{word}'. ¿Quisiste decir '{self.TYPO_DICTIONARY[word]}'?",
+                                f"Identificador inválido: '{word}'. Los identificadores solo pueden contener caracteres ASCII alfanuméricos y guiones bajos.",
                                 Position(line_num, id_start + 1, current_pos.index + id_start)
                             )
-                        self.tokens.append(Token(TokenType.IDENTIFIER, word, 
-                            Position(line_num, id_start + 1, current_pos.index + id_start)))
-                    continue
-                
-                # Procesar operadores y delimitadores
-                if char in '+-*/%=<>!&|^~':
-                    # Verificar operadores de dos caracteres
-                    if i + 1 < len(line) and line[i:i+2] in self.OPERATORS:
-                        self.tokens.append(Token(TokenType.OPERATOR, line[i:i+2], 
-                            Position(line_num, i + 1, current_pos.index + i)))
-                        i += 2
-                    else:
-                        self.tokens.append(Token(TokenType.OPERATOR, char, 
+                        # Verificar si es una palabra clave
+                        elif word in self.KEYWORDS:
+                            self.tokens.append(Token(TokenType.KEYWORD, word, 
+                                Position(line_num, id_start + 1, current_pos.index + id_start)))
+                        # Verificar si es un type hint
+                        elif word in self.TYPE_HINTS:
+                            self.tokens.append(Token(TokenType.TYPE_HINT, word, 
+                                Position(line_num, id_start + 1, current_pos.index + id_start)))
+                        # Es un identificador
+                        else:
+                            if word in self.TYPO_DICTIONARY:
+                                self._add_error(
+                                    f"Posible error tipográfico: '{word}'. ¿Quisiste decir '{self.TYPO_DICTIONARY[word]}'?",
+                                    Position(line_num, id_start + 1, current_pos.index + id_start)
+                                )
+                            self.tokens.append(Token(TokenType.IDENTIFIER, word, 
+                                Position(line_num, id_start + 1, current_pos.index + id_start)))
+                        continue
+                    
+                    # Procesar operadores y delimitadores
+                    if char in '+-*/%=<>!&|^~':
+                        # Verificar operadores de dos caracteres
+                        if i + 1 < len(line) and line[i:i+2] in self.OPERATORS:
+                            self.tokens.append(Token(TokenType.OPERATOR, line[i:i+2], 
+                                Position(line_num, i + 1, current_pos.index + i)))
+                            i += 2
+                        else:
+                            # Asegurarse de que el operador '=' se tokenice correctamente
+                            if char == '=':
+                                self.tokens.append(Token(TokenType.OPERATOR, '=', 
+                                    Position(line_num, i + 1, current_pos.index + i)))
+                            else:
+                                self.tokens.append(Token(TokenType.OPERATOR, char, 
+                                    Position(line_num, i + 1, current_pos.index + i)))
+                            i += 1
+                        continue
+                    
+                    # Procesar delimitadores
+                    if char in '(){}[],:;.':
+                        self.tokens.append(Token(TokenType.DELIMITER, char, 
                             Position(line_num, i + 1, current_pos.index + i)))
                         i += 1
-                    continue
-                
-                # Procesar delimitadores
-                if char in '(){}[],:;.':
-                    self.tokens.append(Token(TokenType.DELIMITER, char, 
-                        Position(line_num, i + 1, current_pos.index + i)))
+                        continue
+                    
+                    # Carácter no reconocido
+                    self._add_error(f"Carácter no reconocido: '{char}'", 
+                        Position(line_num, i + 1, current_pos.index + i))
                     i += 1
-                    continue
                 
-                # Carácter no reconocido
-                self._add_error(f"Carácter no reconocido: '{char}'", 
-                    Position(line_num, i + 1, current_pos.index + i))
-                i += 1
-            
             # Agregar token de nueva línea al final de cada línea
             self.tokens.append(Token(TokenType.NEWLINE, '\n', 
                 Position(line_num, len(line) + 1, current_pos.index + len(line))))

@@ -30,6 +30,13 @@ class Parser:
         """
         declaraciones = []
         while not self.is_at_end():
+            # Ignorar líneas en blanco consecutivas
+            while self.check(TokenType.NEWLINE):
+                self.advance()
+            
+            if self.is_at_end():
+                break
+            
             try:
                 decl = self.declaracion()
                 if decl:
@@ -43,29 +50,48 @@ class Parser:
         """
         DECLARACIÓN → DECLARACIÓN_VAR | DECLARACIÓN_FUN | IF_STMT | RETURN_STMT | EXPRESIÓN_STATEMENT
         """
+        # Ignorar comentarios
         if self.check(TokenType.COMMENT):
             self.advance()
             return None
         
-        if self.match(TokenType.IDENTIFIER) and self.check_token(TokenType.OPERATOR, "="):
-            return self.declaracion_var()
-        
+        # Verificar si es una declaración de función
         if self.match_keyword("def"):
             return self.declaracion_fun()
         
+        # Verificar si es una declaración if
         if self.match_keyword("if"):
             return self.if_statement()
         
+        # Verificar si es una declaración return
         if self.match_keyword("return"):
             return self.return_statement()
         
+        # Verificar si es una declaración de variable
+        if self.check(TokenType.IDENTIFIER):
+            # Guardar la posición actual para poder retroceder si es necesario
+            current_pos = self.current
+            
+            # Avanzar al siguiente token después del identificador
+            self.advance()
+            
+            # Si el siguiente token es un operador de asignación
+            if self.check_token(TokenType.OPERATOR, "="):
+                # Retroceder al identificador
+                self.current = current_pos
+                return self.declaracion_var()
+            else:
+                # No es una asignación, retroceder y tratar como expresión
+                self.current = current_pos
+        
+        # Si llegamos aquí, debe ser una expresión
         return self.expresion_statement()
 
     def declaracion_var(self):
         """
         DECLARACIÓN_VAR → IDENTIFICADOR "=" EXPRESIÓN
         """
-        nombre = self.previous().value
+        nombre = self.consume(TokenType.IDENTIFIER, "Se esperaba un identificador").value
         self.consume(TokenType.OPERATOR, "Se esperaba '=' después del identificador")
         valor = self.expresion()
         return VarDecl(nombre, valor)
@@ -79,16 +105,20 @@ class Parser:
             self.consume(TokenType.DELIMITER, "Se esperaba '(' después del nombre de función")
             
             parametros = []
-            parentesis_abiertos = 1  # Contador de paréntesis
-            
             if not self.check_token(TokenType.DELIMITER, ")"):
                 parametros = self.params()
             
             # Verificar que se cierre el paréntesis
-            if not self.match_token(TokenType.DELIMITER, ")"):
-                raise self.error(self.peek(), "Paréntesis sin cerrar en la definición de función")
+            self.consume(TokenType.DELIMITER, "Se esperaba ')' después de los parámetros")
             
+            # Verificar los dos puntos después de la declaración de función
             self.consume(TokenType.DELIMITER, "Se esperaba ':' después de la declaración de función")
+            
+            # Consumir cualquier NEWLINE después de los dos puntos
+            while self.check(TokenType.NEWLINE) or self.check(TokenType.COMMENT):
+                self.advance()
+            
+            # Ahora debería haber un token INDENT
             return FunDecl(nombre, parametros, None, self.bloque())
         except SyntaxError as e:
             self.errors.append(e)
@@ -124,8 +154,23 @@ class Parser:
         """
         EXPRESIÓN_STATEMENT → EXPRESIÓN
         """
-        expr = self.expresion()
-        return ExpressionStmt(expr)
+        # Si encontramos un comentario o una línea en blanco, lo ignoramos
+        if self.check(TokenType.COMMENT) or self.check(TokenType.NEWLINE):
+            self.advance()
+            return None
+        
+        try:
+            expr = self.expresion()
+            
+            # Consumir el token NEWLINE si existe
+            if self.check(TokenType.NEWLINE):
+                self.advance()
+            
+            return ExpressionStmt(expr)
+        except Exception as e:
+            self.errors.append(SyntaxError(f"Error en expresión: {str(e)}", self.peek()))
+            self.synchronize()
+            return None
 
     def expresion(self):
         """
@@ -202,7 +247,7 @@ class Parser:
 
     def primario(self):
         """
-        PRIMARIO → NUMERO | STRING | "True" | "False" | "None" | "(" EXPRESIÓN ")" | IDENTIFICADOR
+        PRIMARIO → NUMERO | STRING | "True" | "False" | "None" | "(" EXPRESIÓN ")" | IDENTIFICADOR | LLAMADA
         """
         if self.match(TokenType.NUMBER):
             return Literal(float(self.previous().value))
@@ -225,21 +270,58 @@ class Parser:
             return GroupingExpr(expr)
         
         if self.match(TokenType.IDENTIFIER):
-            return Identifier(self.previous().value)
+            name = self.previous().value
+            
+            # Verificar si es una llamada a función
+            if self.check_token(TokenType.DELIMITER, "("):
+                return self.finalizar_llamada(Identifier(name))
+            
+            return Identifier(name)
+        
+        # Si es una llamada a función con una palabra clave como 'print'
+        if self.match(TokenType.KEYWORD) and self.check_token(TokenType.DELIMITER, "("):
+            name = self.previous().value
+            return self.finalizar_llamada(Identifier(name))
         
         raise self.error(self.peek(), "Se esperaba una expresión")
+
+    def finalizar_llamada(self, callee):
+        """Finalizar una llamada a función"""
+        arguments = []
+        
+        # Consumir el paréntesis de apertura
+        self.consume(TokenType.DELIMITER, "Se esperaba '(' después del nombre de función")
+        
+        # Si no hay argumentos
+        if not self.check_token(TokenType.DELIMITER, ")"):
+            # Procesar el primer argumento
+            arguments.append(self.expresion())
+            
+            # Procesar argumentos adicionales
+            while self.match_token(TokenType.DELIMITER, ","):
+                arguments.append(self.expresion())
+        
+        # Consumir el paréntesis de cierre
+        self.consume(TokenType.DELIMITER, "Se esperaba ')' después de los argumentos")
+        
+        return CallExpr(callee, arguments)
 
     def bloque(self):
         """
         BLOQUE → DECLARACIÓN*
         """
         declaraciones = []
-        self.indent_level += 1  # Aumentar nivel de indentación esperado
         
-        while not self.is_at_end():
-            # Verificar indentación
-            if not self.check_indentation():
-                raise self.error(self.peek(), f"Indentación incorrecta. Se esperaban {self.indent_level * 4} espacios")
+        # Verificar que haya un token INDENT después de los dos puntos
+        if not self.match(TokenType.INDENT):
+            raise self.error(self.peek(), "Se esperaba indentación después de los dos puntos")
+        
+        # Procesar declaraciones hasta encontrar un DEDENT o EOF
+        while not self.is_at_end() and not self.check(TokenType.DEDENT):
+            # Ignorar líneas en blanco (solo NEWLINE)
+            if self.check(TokenType.NEWLINE):
+                self.advance()
+                continue
             
             try:
                 decl = self.declaracion()
@@ -249,13 +331,15 @@ class Parser:
                 self.errors.append(e)
                 self.synchronize()
         
-        self.indent_level -= 1  # Restaurar nivel de indentación
+        # Consumir el token DEDENT si existe
+        if self.check(TokenType.DEDENT):
+            self.advance()
+        
         return declaraciones
-    
+
     def check_indentation(self) -> bool:
         """Verifica que la indentación sea correcta"""
-        if self.peek().position.column != self.indent_level * 4:
-            return False
+        # Esta función ya no es necesaria con el manejo de tokens INDENT/DEDENT
         return True
 
     def return_statement(self):
@@ -298,20 +382,23 @@ class Parser:
                 return True
         return False
 
-    def match_token(self, type: TokenType, value: str) -> bool:
-        """Check if current token matches the given type and value"""
-        if self.is_at_end():
+    def match_token(self, type: TokenType, value: str = None) -> bool:
+        """Match if the current token is of the given type and value"""
+        if not self.check(type):
             return False
-        if self.peek().type != type:
+        
+        if value is not None and self.peek().value != value:
             return False
-        if self.peek().value != value:
-            return False
+        
         self.advance()
         return True
 
     def match_keyword(self, keyword: str) -> bool:
-        """Check if current token is a keyword with the given value"""
-        return self.match_token(TokenType.KEYWORD, keyword)
+        """Match if the current token is a keyword with the given value"""
+        if self.check(TokenType.KEYWORD) and self.peek().value == keyword:
+            self.advance()
+            return True
+        return False
 
     def check(self, type: TokenType) -> bool:
         """Check if current token is of given type"""
@@ -319,15 +406,22 @@ class Parser:
             return False
         return self.peek().type == type
 
-    def check_token(self, type: TokenType, value: str) -> bool:
-        """Check if current token matches the given type and value"""
+    def check_token(self, type: TokenType, value: str = None) -> bool:
+        """Check if the current token is of the given type and value"""
         if self.is_at_end():
             return False
-        return self.peek().type == type and self.peek().value == value
+        
+        if self.peek().type != type:
+            return False
+        
+        if value is not None and self.peek().value != value:
+            return False
+        
+        return True
 
     def check_keyword(self, keyword: str) -> bool:
         """Check if current token is a keyword with the given value"""
-        return self.check_token(TokenType.KEYWORD, keyword)
+        return self.check(TokenType.KEYWORD) and self.peek().value == keyword
 
     def advance(self) -> Token:
         """Advance to next token"""
@@ -394,15 +488,30 @@ class Parser:
         self.advance()
 
         while not self.is_at_end():
-            # Si encontramos un comentario, lo saltamos
-            if self.peek().type == TokenType.COMMENT:
-                self.advance()
-                continue
-            
-            if self.previous().type == TokenType.DELIMITER and self.previous().value == ";":
+            # Si encontramos un token de nueva línea, podría ser el final de la declaración actual
+            if self.previous().type == TokenType.NEWLINE:
                 return
 
-            if self.peek().type == TokenType.KEYWORD and self.peek().value in ["def", "class", "if", "while", "return"]:
+            # Si encontramos un token de indentación o desindentación, estamos en un nuevo bloque
+            if self.peek().type in [TokenType.INDENT, TokenType.DEDENT]:
+                return
+
+            # Si encontramos una palabra clave que podría iniciar una nueva declaración
+            if self.peek().type == TokenType.KEYWORD and self.peek().value in ["def", "class", "if", "while", "for", "return"]:
                 return
 
             self.advance() 
+
+    def check_next(self, type: TokenType, value: str = None) -> bool:
+        """Check if the next token is of the given type and value"""
+        if self.is_at_end() or self.current + 1 >= len(self.tokens):
+            return False
+        
+        next_token = self.tokens[self.current + 1]
+        if next_token.type != type:
+            return False
+        
+        if value is not None and next_token.value != value:
+            return False
+        
+        return True 
