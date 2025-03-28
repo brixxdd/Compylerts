@@ -14,278 +14,201 @@ class Parser:
         self.tokens = tokens
         self.current = 0
         self.errors = []
+        self.indent_level = 0  # Nivel actual de indentación
 
     def parse(self):
         """Parse the program and return an AST"""
         try:
-            return self.program()
+            return self.programa()
         except Exception as e:
             self.errors.append(e)
             return None
 
-    def program(self):
+    def programa(self):
         """
-        program -> statement_list EOF
+        PROGRAMA → DECLARACIÓN*
         """
-        statements = []
+        declaraciones = []
         while not self.is_at_end():
             try:
-                stmt = self.declaration()
-                if stmt:
-                    statements.append(stmt)
+                decl = self.declaracion()
+                if decl:
+                    declaraciones.append(decl)
             except SyntaxError as e:
                 self.errors.append(e)
                 self.synchronize()
-        return Program(statements)
+        return Program(declaraciones)
 
-    def declaration(self):
+    def declaracion(self):
         """
-        declaration -> variable_declaration | function_declaration | statement
+        DECLARACIÓN → DECLARACIÓN_VAR | DECLARACIÓN_FUN | IF_STMT | RETURN_STMT | EXPRESIÓN_STATEMENT
         """
-        # Ignorar comentarios
         if self.check(TokenType.COMMENT):
-            self.advance()  # Consumir el comentario
-            return None     # No hay declaración que procesar
-            
+            self.advance()
+            return None
+        
+        if self.match(TokenType.IDENTIFIER) and self.check_token(TokenType.OPERATOR, "="):
+            return self.declaracion_var()
+        
         if self.match_keyword("def"):
-            return self.function_declaration()
+            return self.declaracion_fun()
         
-        if self.match_keyword("class"):
-            # Implementar cuando sea necesario
-            pass
-        
-        return self.statement()
-
-    def function_declaration(self):
-        """
-        function_declaration -> "def" IDENTIFIER "(" parameter_list ")" ["->" type] ":" function_body
-        parameter_list -> parameter ("," parameter)* | ε
-        parameter -> IDENTIFIER [":" type]
-        function_body -> statement_list
-        """
-        name_token = self.consume(TokenType.IDENTIFIER, "Expect function name.")
-        name = name_token.value
-        
-        self.consume(TokenType.DELIMITER, "Expect '(' after function name.")
-        
-        parameters = []
-        if not self.check_token(TokenType.DELIMITER, ")"):
-            # Parse parameters
-            while True:
-                param_name = self.consume(TokenType.IDENTIFIER, "Expect parameter name.").value
-                param_type = None
-                
-                if self.match_token(TokenType.DELIMITER, ":"):
-                    param_type = self.consume(TokenType.TYPE_HINT, "Expect type hint after ':'.").value
-                
-                parameters.append(VariableDecl(param_name, param_type))
-                
-                if not self.match_token(TokenType.DELIMITER, ","):
-                    break
-        
-        self.consume(TokenType.DELIMITER, "Expect ')' after parameters.")
-        
-        # Return type
-        return_type = None
-        if self.match_token(TokenType.OPERATOR, "->"):
-            return_type = self.consume(TokenType.TYPE_HINT, "Expect return type after '->'.").value
-        
-        self.consume(TokenType.DELIMITER, "Expect ':' before function body.")
-        
-        # Function body - collect only the return statement
-        body = []
-        
-        # En un analizador real, aquí verificaríamos la indentación
-        # Como simplificación, consideraremos que el cuerpo de la función incluye
-        # solo la primera declaración (return)
-        if not self.is_at_end():
-            stmt = self.statement()
-            if stmt:
-                body.append(stmt)
-        
-        return FunctionDecl(name, parameters, return_type, body)
-
-    def statement(self):
-        """
-        statement -> expression_statement
-                  | if_statement
-                  | while_statement
-                  | return_statement
-        """
-        # Ignorar comentarios
-        if self.check(TokenType.COMMENT):
-            self.advance()  # Consumir el comentario
-            return None     # No hay statement que procesar
-            
         if self.match_keyword("if"):
             return self.if_statement()
-        
-        if self.match_keyword("while"):
-            return self.while_statement()
         
         if self.match_keyword("return"):
             return self.return_statement()
         
-        return self.expression_statement()
+        return self.expresion_statement()
 
-    def if_statement(self):
+    def declaracion_var(self):
         """
-        if_statement -> "if" expression ":" statement_list ["else" ":" statement_list]
+        DECLARACIÓN_VAR → IDENTIFICADOR "=" EXPRESIÓN
         """
-        condition = self.expression()
-        self.consume(TokenType.DELIMITER, "Expect ':' after if condition.")
-        
-        # Recopilar un solo statement para la rama 'then'
-        # En Python real, esto sería un bloque indentado
-        then_branch = []
-        stmt = self.statement()
-        if stmt:
-            then_branch.append(stmt)
-        
-        # Manejar la rama 'else' si existe
-        else_branch = None
-        if self.match_keyword("else"):
-            self.consume(TokenType.DELIMITER, "Expect ':' after 'else'.")
-            else_branch = []
+        nombre = self.previous().value
+        self.consume(TokenType.OPERATOR, "Se esperaba '=' después del identificador")
+        valor = self.expresion()
+        return VarDecl(nombre, valor)
+
+    def declaracion_fun(self):
+        """
+        DECLARACIÓN_FUN → "def" IDENTIFICADOR "(" PARAMS ")" [ "->" TIPO ] ":" BLOQUE
+        """
+        try:
+            nombre = self.consume(TokenType.IDENTIFIER, "Se esperaba nombre de función").value
+            self.consume(TokenType.DELIMITER, "Se esperaba '(' después del nombre de función")
             
-            # Recopilar un solo statement para la rama 'else'
-            stmt = self.statement()
-            if stmt:
-                else_branch.append(stmt)
-        
-        return IfStmt(condition, then_branch, else_branch)
+            parametros = []
+            parentesis_abiertos = 1  # Contador de paréntesis
+            
+            if not self.check_token(TokenType.DELIMITER, ")"):
+                parametros = self.params()
+            
+            # Verificar que se cierre el paréntesis
+            if not self.match_token(TokenType.DELIMITER, ")"):
+                raise self.error(self.peek(), "Paréntesis sin cerrar en la definición de función")
+            
+            self.consume(TokenType.DELIMITER, "Se esperaba ':' después de la declaración de función")
+            return FunDecl(nombre, parametros, None, self.bloque())
+        except SyntaxError as e:
+            self.errors.append(e)
+            self.synchronize()
+            return None
 
-    def while_statement(self):
+    def params(self):
         """
-        while_statement -> "while" expression ":" statement_list
+        PARAMS → [IDENTIFICADOR ("," IDENTIFICADOR)*]
         """
-        condition = self.expression()
-        self.consume(TokenType.DELIMITER, "Expect ':' after while condition.")
+        parametros = []
+        parametros.append(self.consume(TokenType.IDENTIFIER, "Se esperaba nombre de parámetro").value)
         
-        body = []
-        while not self.is_at_end() and not self.check_keyword("def"):
-            stmt = self.statement()
-            if stmt:
-                body.append(stmt)
+        while self.match_token(TokenType.DELIMITER, ","):
+            # Verificar que no haya coma extra antes del cierre
+            if self.check_token(TokenType.DELIMITER, ")"):
+                raise self.error(self.previous(), "Coma extra antes del cierre de paréntesis")
+            
+            parametros.append(
+                self.consume(TokenType.IDENTIFIER, "Se esperaba nombre de parámetro después de ','").value
+            )
         
-        return WhileStmt(condition, body)
+        return parametros
 
-    def return_statement(self):
+    def tipo(self):
         """
-        return_statement -> "return" [expression] NEWLINE
+        TIPO → "int" | "str" | "bool" | "float" | "list" | "dict"
         """
-        value = None
-        if not self.check_token(TokenType.DELIMITER, ";") and not self.check_token(TokenType.EOF, ""):
-            value = self.expression()
-        
-        return ReturnStmt(value)
+        tipo = self.consume(TokenType.TYPE_HINT, "Se esperaba un tipo válido")
+        return tipo.value
 
-    def expression_statement(self):
+    def expresion_statement(self):
         """
-        expression_statement -> expression NEWLINE
+        EXPRESIÓN_STATEMENT → EXPRESIÓN
         """
-        expr = self.expression()
+        expr = self.expresion()
         return ExpressionStmt(expr)
 
-    def expression(self):
+    def expresion(self):
         """
-        expression -> assignment
+        EXPRESIÓN → ASIGNACIÓN
         """
-        return self.assignment()
+        return self.asignacion()
 
-    def assignment(self):
+    def asignacion(self):
         """
-        assignment -> equality ("=" assignment)?
+        ASIGNACIÓN → COMPARACIÓN ("=" ASIGNACIÓN)?
         """
-        expr = self.equality()
+        expr = self.comparacion()
         
         if self.match_token(TokenType.OPERATOR, "="):
-            value = self.assignment()
-            
+            valor = self.asignacion()
             if isinstance(expr, Identifier):
-                return AssignExpr(expr, value)
-            
-            self.error(self.previous(), "Invalid assignment target.")
+                return AssignExpr(expr, valor)
+            raise self.error(self.previous(), "Objetivo de asignación inválido")
         
         return expr
 
-    def equality(self):
+    def comparacion(self):
         """
-        equality -> comparison (("==" | "!=") comparison)*
+        COMPARACIÓN → SUMA (("==" | "!=") SUMA)*
         """
-        expr = self.comparison()
+        expr = self.suma()
         
         while self.match_token(TokenType.OPERATOR, "==") or self.match_token(TokenType.OPERATOR, "!="):
-            operator = self.previous().value
-            right = self.comparison()
-            expr = BinaryExpr(expr, operator, right)
+            operador = self.previous().value
+            derecho = self.suma()
+            expr = BinaryExpr(expr, operador, derecho)
         
         return expr
 
-    def comparison(self):
+    def suma(self):
         """
-        comparison -> term ((">" | ">=" | "<" | "<=") term)*
+        SUMA → MULT (("+" | "-") MULT)*
         """
-        expr = self.term()
-        
-        while (self.match_token(TokenType.OPERATOR, ">") or 
-               self.match_token(TokenType.OPERATOR, ">=") or 
-               self.match_token(TokenType.OPERATOR, "<") or 
-               self.match_token(TokenType.OPERATOR, "<=")):
-            operator = self.previous().value
-            right = self.term()
-            expr = BinaryExpr(expr, operator, right)
-        
-        return expr
-
-    def term(self):
-        """
-        term -> factor (("+" | "-") factor)*
-        """
-        expr = self.factor()
+        expr = self.mult()
         
         while self.match_token(TokenType.OPERATOR, "+") or self.match_token(TokenType.OPERATOR, "-"):
-            operator = self.previous().value
-            right = self.factor()
-            expr = BinaryExpr(expr, operator, right)
+            operador = self.previous().value
+            derecho = self.mult()
+            expr = BinaryExpr(expr, operador, derecho)
         
         return expr
 
-    def factor(self):
+    def mult(self):
         """
-        factor -> unary (("*" | "/") unary)*
+        MULT → UNARIO (("*" | "/" | "//" | "%") UNARIO)*
         """
-        expr = self.unary()
+        expr = self.unario()
         
-        while self.match_token(TokenType.OPERATOR, "*") or self.match_token(TokenType.OPERATOR, "/"):
-            operator = self.previous().value
-            right = self.unary()
-            expr = BinaryExpr(expr, operator, right)
+        while (self.match_token(TokenType.OPERATOR, "*") or 
+               self.match_token(TokenType.OPERATOR, "/") or
+               self.match_token(TokenType.OPERATOR, "//") or
+               self.match_token(TokenType.OPERATOR, "%")):
+            operador = self.previous().value
+            derecho = self.unario()
+            expr = BinaryExpr(expr, operador, derecho)
         
         return expr
 
-    def unary(self):
+    def unario(self):
         """
-        unary -> ("-" | "!") unary | primary
+        UNARIO → ("-" | "!") UNARIO | PRIMARIO
         """
         if self.match_token(TokenType.OPERATOR, "-") or self.match_token(TokenType.OPERATOR, "!"):
-            operator = self.previous().value
-            right = self.unary()
-            return UnaryExpr(operator, right)
+            operador = self.previous().value
+            derecho = self.unario()
+            return UnaryExpr(operador, derecho)
         
-        return self.primary()
+        return self.primario()
 
-    def primary(self):
+    def primario(self):
         """
-        primary -> NUMBER | STRING | "True" | "False" | "None" | "(" expression ")" | IDENTIFIER | call
+        PRIMARIO → NUMERO | STRING | "True" | "False" | "None" | "(" EXPRESIÓN ")" | IDENTIFICADOR
         """
         if self.match(TokenType.NUMBER):
             return Literal(float(self.previous().value))
         
         if self.match(TokenType.STRING):
-            # Quitar comillas
-            value = self.previous().value[1:-1]
-            return Literal(value)
+            return Literal(self.previous().value[1:-1])  # Quitar comillas
         
         if self.match_keyword("True"):
             return Literal(True)
@@ -297,35 +220,74 @@ class Parser:
             return Literal(None)
         
         if self.match_token(TokenType.DELIMITER, "("):
-            expr = self.expression()
-            self.consume(TokenType.DELIMITER, "Expect ')' after expression.")
-            return expr
+            expr = self.expresion()
+            self.consume(TokenType.DELIMITER, "Se esperaba ')' después de la expresión")
+            return GroupingExpr(expr)
         
         if self.match(TokenType.IDENTIFIER):
-            name = self.previous().value
-            
-            # Verificar si es una llamada a función
-            if self.match_token(TokenType.DELIMITER, "("):
-                arguments = []
-                
-                # Parsear argumentos
-                if not self.check_token(TokenType.DELIMITER, ")"):
-                    while True:
-                        arguments.append(self.expression())
-                        
-                        if self.match_token(TokenType.DELIMITER, ","):
-                            # Verificar si hay otro argumento después de la coma
-                            if self.check_token(TokenType.DELIMITER, ")"):
-                                raise self.error(self.peek(), "Expected argument after comma, got ')'")
-                        else:
-                            break
-                
-                self.consume(TokenType.DELIMITER, "Expect ')' after arguments.")
-                return CallExpr(Identifier(name), arguments)
-            
-            return Identifier(name)
+            return Identifier(self.previous().value)
         
-        raise self.error(self.peek(), "Expect expression.")
+        raise self.error(self.peek(), "Se esperaba una expresión")
+
+    def bloque(self):
+        """
+        BLOQUE → DECLARACIÓN*
+        """
+        declaraciones = []
+        self.indent_level += 1  # Aumentar nivel de indentación esperado
+        
+        while not self.is_at_end():
+            # Verificar indentación
+            if not self.check_indentation():
+                raise self.error(self.peek(), f"Indentación incorrecta. Se esperaban {self.indent_level * 4} espacios")
+            
+            try:
+                decl = self.declaracion()
+                if decl:
+                    declaraciones.append(decl)
+            except SyntaxError as e:
+                self.errors.append(e)
+                self.synchronize()
+        
+        self.indent_level -= 1  # Restaurar nivel de indentación
+        return declaraciones
+    
+    def check_indentation(self) -> bool:
+        """Verifica que la indentación sea correcta"""
+        if self.peek().position.column != self.indent_level * 4:
+            return False
+        return True
+
+    def return_statement(self):
+        """
+        RETURN_STMT → "return" EXPRESIÓN?
+        """
+        keyword = self.previous()  # token 'return'
+        valor = None
+        
+        if not self.check_token(TokenType.DELIMITER, ";") and not self.is_at_end():
+            valor = self.expresion()
+        
+        return ReturnStmt(valor)
+
+    def if_statement(self):
+        """
+        IF_STMT → "if" EXPRESIÓN ":" BLOQUE ("else" ":" BLOQUE)?
+        """
+        condicion = self.expresion()
+        
+        if not self.match_token(TokenType.DELIMITER, ":"):
+            raise self.error(self.peek(), "Falta ':' después de la condición if")
+        
+        then_branch = self.bloque()
+        
+        else_branch = None
+        if self.match_keyword("else"):
+            if not self.match_token(TokenType.DELIMITER, ":"):
+                raise self.error(self.peek(), "Falta ':' después de 'else'")
+            else_branch = self.bloque()
+        
+        return IfStmt(condicion, then_branch, else_branch)
 
     # Métodos auxiliares
     def match(self, *types: TokenType) -> bool:
@@ -432,6 +394,11 @@ class Parser:
         self.advance()
 
         while not self.is_at_end():
+            # Si encontramos un comentario, lo saltamos
+            if self.peek().type == TokenType.COMMENT:
+                self.advance()
+                continue
+            
             if self.previous().type == TokenType.DELIMITER and self.previous().value == ";":
                 return
 

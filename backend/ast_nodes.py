@@ -7,76 +7,98 @@ class Node:
     pass
 
 @dataclass
-class Expression(Node):
+class Expr(Node):
     """Base class for all expressions"""
     pass
 
 @dataclass
-class Statement(Node):
+class Stmt(Node):
     """Base class for all statements"""
     pass
 
 @dataclass
-class Literal(Expression):
+class Program(Node):
+    declarations: List[Stmt]
+
+@dataclass
+class VarDecl(Stmt):
+    name: str
+    initializer: Expr
+
+@dataclass
+class FunDecl(Stmt):
+    name: str
+    params: List[str]
+    return_type: Optional[str]
+    body: List[Stmt]
+
+@dataclass
+class ExpressionStmt(Stmt):
+    expression: Expr
+
+@dataclass
+class BinaryExpr(Expr):
+    left: Expr
+    operator: str
+    right: Expr
+
+@dataclass
+class UnaryExpr(Expr):
+    operator: str
+    right: Expr
+
+@dataclass
+class GroupingExpr(Expr):
+    expression: Expr
+
+@dataclass
+class Literal(Expr):
     value: Any
 
 @dataclass
-class Identifier(Expression):
+class Identifier(Expr):
     name: str
 
 @dataclass
-class BinaryExpr(Expression):
-    left: Expression
-    operator: str
-    right: Expression
-
-@dataclass
-class UnaryExpr(Expression):
-    operator: str
-    right: Expression
-
-@dataclass
-class CallExpr(Expression):
-    callee: Expression
-    arguments: List[Expression]
-
-@dataclass
-class AssignExpr(Expression):
+class AssignExpr(Expr):
     name: Identifier
-    value: Expression
+    value: Expr
 
 @dataclass
-class ExpressionStmt(Statement):
-    expression: Expression
+class CallExpr(Expr):
+    callee: Expr
+    arguments: List[Expr]
 
 @dataclass
-class VariableDecl(Statement):
-    name: str
-    type_hint: Optional[str] = None
-    initializer: Optional[Expression] = None
+class ReturnStmt(Stmt):
+    value: Optional[Expr]
 
 @dataclass
-class FunctionDecl(Statement):
-    name: str
-    params: List[VariableDecl]
-    return_type: Optional[str]
-    body: List[Statement]
+class IfStmt(Stmt):
+    condition: Expr
+    then_branch: List[Stmt]
+    else_branch: Optional[List[Stmt]] = None
 
 @dataclass
-class ReturnStmt(Statement):
-    value: Optional[Expression] = None
+class WhileStmt(Stmt):
+    condition: Expr
+    body: List[Stmt]
 
 @dataclass
-class IfStmt(Statement):
-    condition: Expression
-    then_branch: List[Statement]
-    else_branch: Optional[List[Statement]] = None
+class ErrorStmt(Stmt):
+    """Representa un error sintáctico"""
+    message: str
+    line: int
+    column: int
 
 @dataclass
-class WhileStmt(Statement):
-    condition: Expression
-    body: List[Statement]
+class IndentationError(ErrorStmt):
+    """Error específico de indentación"""
+    expected_indent: int
+    actual_indent: int
 
 @dataclass
-class Program(Node):
-    statements: List[Statement] 
+class DelimiterError(ErrorStmt):
+    """Error de delimitadores (paréntesis, dos puntos, etc)"""
+    expected: str
+    found: Optional[str] 

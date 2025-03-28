@@ -21,6 +21,9 @@ class TokenType(enum.Enum):
     WHITESPACE = 'whitespace'
     ERROR = 'error'
     EOF = 'eof'
+    INDENT = 'indent'
+    DEDENT = 'dedent'
+    NEWLINE = 'newline'
 
 @dataclass
 class Position:
@@ -193,205 +196,156 @@ class LexicalAnalyzer:
 
     def __init__(self):
         self.source_code = ""
-        self.tokens: List[Token] = []
-        self.errors: List[dict] = []
+        self.tokens = []
+        self.errors = []
+        self.indent_stack = [0]  # Para rastrear niveles de indentación
         
+    def handle_indentation(self, line: str, line_number: int) -> int:
+        """
+        Maneja la indentación al inicio de una línea
+        Retorna el número de espacios de indentación
+        """
+        indent = len(line) - len(line.lstrip())
+        if indent % 4 != 0:  # Python usa 4 espacios por nivel
+            self._add_error(
+                f"Indentación inválida: {indent} espacios (debe ser múltiplo de 4)",
+                Position(line_number, 1, 0)
+            )
+        return indent
+
     def tokenize(self, source_code: str) -> List[Token]:
-        """Main tokenization method"""
         self.source_code = source_code
         self.tokens = []
         self.errors = []
-        
         current_pos = Position(1, 1, 0)
-        current_lexeme = ""
-        state = 'START'
-        string_start_pos = None
         
-        while current_pos.index < len(source_code):
-            char = source_code[current_pos.index]
-            
-            if state == 'START':
-                if char.isspace():
-                    if char == '\n':
-                        current_pos = Position(current_pos.line + 1, 1, current_pos.index + 1)
-                    else:
-                        current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
-                    continue
-                
-                elif char == '@':
-                    state = 'DECORATOR'
-                    current_lexeme = char
-                    current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
-                
-                elif char.isalpha() or char == '_':
-                    # Verificar si es una f-string
-                    if char == 'f' and current_pos.index + 1 < len(source_code) and source_code[current_pos.index + 1] in ['"', "'"]:
-                        # Es una f-string, procesarla como un string
-                        string_start_pos = current_pos
-                        current_lexeme = char
-                        current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
-                        state = 'F_STRING'
-                    else:
-                        # Es un identificador normal
-                        state = 'IDENTIFIER'
-                        current_lexeme = char
-                        current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
-                
-                elif char.isdigit():
-                    state = 'NUMBER'
-                    current_lexeme = char
-                    current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
-                
-                elif char in ['"', "'"]:
-                    state = 'STRING'
-                    string_start_pos = current_pos
-                    current_lexeme = char
-                    current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
-                
-                elif char == '#':
-                    state = 'COMMENT'
-                    current_lexeme = char
-                    current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
-                
-                elif char in '+-*/=<>!&|^~':
-                    # Verificar operadores de dos caracteres
-                    if current_pos.index + 1 < len(source_code):
-                        next_char = source_code[current_pos.index + 1]
-                        two_char_op = char + next_char
-                        if two_char_op in self.OPERATORS:
-                            self.tokens.append(Token(TokenType.OPERATOR, two_char_op, current_pos))
-                            current_pos = Position(
-                                current_pos.line,
-                                current_pos.column + 2,
-                                current_pos.index + 2
-                            )
-                            continue
-                    
-                    # Si no es un operador de dos caracteres, procesar como uno solo
-                    self.tokens.append(Token(TokenType.OPERATOR, char, current_pos))
-                    current_pos = Position(
-                        current_pos.line,
-                        current_pos.column + 1,
-                        current_pos.index + 1
-                    )
-                
-                elif char in '(){}[],:;.':
-                    self.tokens.append(Token(TokenType.DELIMITER, char, current_pos))
-                    current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
-                
-                else:
-                    self._add_error(f"Unrecognized character: '{char}'", current_pos)
-                    current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
-            
-            elif state == 'DECORATOR':
-                if char.isalnum() or char == '_':
-                    current_lexeme += char
-                    current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
-                else:
-                    self.tokens.append(Token(TokenType.DECORATOR, current_lexeme, current_pos))
-                    state = 'START'
-                    current_lexeme = ""
-            
-            elif state == 'IDENTIFIER':
-                if char.isalnum() or char == '_':
-                    current_lexeme += char
-                    current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
-                else:
-                    token_type = TokenType.KEYWORD if current_lexeme in self.KEYWORDS else TokenType.IDENTIFIER
-                    if current_lexeme in self.TYPE_HINTS:
-                        token_type = TokenType.TYPE_HINT
-                    if current_lexeme in self.TYPO_DICTIONARY:
+        lines = source_code.split('\n')
+        for line_num, line in enumerate(lines, 1):
+            # Procesar indentación
+            if line.strip():
+                indent = self.handle_indentation(line, line_num)
+                if indent > self.indent_stack[-1]:
+                    self.indent_stack.append(indent)
+                    self.tokens.append(Token(TokenType.INDENT, " " * indent, current_pos))
+                elif indent < self.indent_stack[-1]:
+                    while indent < self.indent_stack[-1]:
+                        self.indent_stack.pop()
+                        self.tokens.append(Token(TokenType.DEDENT, "", current_pos))
+                    if indent != self.indent_stack[-1]:
                         self._add_error(
-                            f"Possible typo: '{current_lexeme}'. Did you mean '{self.TYPO_DICTIONARY[current_lexeme]}'?",
-                            Position(current_pos.line, current_pos.column - len(current_lexeme), current_pos.index - len(current_lexeme))
+                            f"Indentación inconsistente",
+                            Position(line_num, 1, 0)
                         )
-                    self.tokens.append(Token(token_type, current_lexeme, current_pos))
-                    state = 'START'
-                    current_lexeme = ""
-            
-            elif state == 'NUMBER':
-                if char.isdigit() or char == '.':
-                    current_lexeme += char
-                    current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
-                else:
-                    self.tokens.append(Token(TokenType.NUMBER, current_lexeme, current_pos))
-                    state = 'START'
-                    current_lexeme = ""
-            
-            elif state == 'F_STRING':
-                # Obtener el delimitador de la cadena (comilla simple o doble)
-                quote = source_code[current_pos.index]
-                if quote not in ['"', "'"]:
-                    self._add_error(f"Expected string delimiter after 'f', got '{quote}'", current_pos)
-                    state = 'START'
+
+            # Procesar el contenido de la línea
+            i = indent
+            while i < len(line):
+                char = line[i]
+                
+                # Saltar espacios en blanco
+                if char.isspace():
+                    i += 1
                     continue
                 
-                current_lexeme += quote
-                current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
+                # Procesar comentarios
+                if char == '#':
+                    comment = line[i:]
+                    self.tokens.append(Token(TokenType.COMMENT, comment, 
+                        Position(line_num, i + 1, current_pos.index + i)))
+                    break
                 
-                # Procesar el contenido de la f-string
-                while current_pos.index < len(source_code):
-                    char = source_code[current_pos.index]
-                    current_lexeme += char
-                    current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
+                # Procesar strings
+                if char in '"\'':
+                    string_start = i
+                    quote = char
+                    i += 1
+                    while i < len(line) and line[i] != quote:
+                        if line[i] == '\\':
+                            i += 2
+                        else:
+                            i += 1
+                    if i >= len(line):
+                        self._add_error("String sin terminar", 
+                            Position(line_num, string_start + 1, current_pos.index + string_start))
+                    else:
+                        self.tokens.append(Token(TokenType.STRING, line[string_start:i+1], 
+                            Position(line_num, string_start + 1, current_pos.index + string_start)))
+                        i += 1
+                    continue
+                
+                # Procesar números
+                if char.isdigit():
+                    num_start = i
+                    while i < len(line) and (line[i].isdigit() or line[i] == '.'):
+                        i += 1
+                    self.tokens.append(Token(TokenType.NUMBER, line[num_start:i], 
+                        Position(line_num, num_start + 1, current_pos.index + num_start)))
+                    continue
+                
+                # Procesar identificadores y palabras clave
+                if char.isalpha() or char == '_':
+                    id_start = i
+                    while i < len(line) and (line[i].isalnum() or line[i] == '_'):
+                        i += 1
+                    word = line[id_start:i]
                     
-                    if char == quote and current_lexeme[-2] != '\\':  # Verificar que no sea una comilla escapada
-                        # Fin de la f-string
-                        self.tokens.append(Token(TokenType.STRING, current_lexeme, string_start_pos))
-                        state = 'START'
-                        current_lexeme = ""
-                        break
-                    
-                    if char == '\n':
-                        self._add_error("Unterminated f-string", string_start_pos)
-                        state = 'START'
-                        current_lexeme = ""
-                        current_pos = Position(current_pos.line + 1, 1, current_pos.index)
-                        break
+                    # Verificar si es una palabra clave
+                    if word in self.KEYWORDS:
+                        self.tokens.append(Token(TokenType.KEYWORD, word, 
+                            Position(line_num, id_start + 1, current_pos.index + id_start)))
+                    # Verificar si es un type hint
+                    elif word in self.TYPE_HINTS:
+                        self.tokens.append(Token(TokenType.TYPE_HINT, word, 
+                            Position(line_num, id_start + 1, current_pos.index + id_start)))
+                    # Es un identificador
+                    else:
+                        if word in self.TYPO_DICTIONARY:
+                            self._add_error(
+                                f"Posible error tipográfico: '{word}'. ¿Quisiste decir '{self.TYPO_DICTIONARY[word]}'?",
+                                Position(line_num, id_start + 1, current_pos.index + id_start)
+                            )
+                        self.tokens.append(Token(TokenType.IDENTIFIER, word, 
+                            Position(line_num, id_start + 1, current_pos.index + id_start)))
+                    continue
                 
-                # Si llegamos al final del archivo sin cerrar la cadena
-                if current_pos.index >= len(source_code) and state == 'F_STRING':
-                    self._add_error("Unterminated f-string", string_start_pos)
-                    state = 'START'
-                    current_lexeme = ""
-            
-            elif state == 'STRING':
-                quote = current_lexeme[0]  # El primer carácter es la comilla que abre
-                current_lexeme += char
-                current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
+                # Procesar operadores y delimitadores
+                if char in '+-*/%=<>!&|^~':
+                    # Verificar operadores de dos caracteres
+                    if i + 1 < len(line) and line[i:i+2] in self.OPERATORS:
+                        self.tokens.append(Token(TokenType.OPERATOR, line[i:i+2], 
+                            Position(line_num, i + 1, current_pos.index + i)))
+                        i += 2
+                    else:
+                        self.tokens.append(Token(TokenType.OPERATOR, char, 
+                            Position(line_num, i + 1, current_pos.index + i)))
+                        i += 1
+                    continue
                 
-                if char == quote and current_lexeme[-2] != '\\':  # Verificar que no sea una comilla escapada
-                    # Fin de la cadena
-                    self.tokens.append(Token(TokenType.STRING, current_lexeme, string_start_pos))
-                    state = 'START'
-                    current_lexeme = ""
-                elif char == '\n':
-                    self._add_error("Unterminated string literal", string_start_pos)
-                    state = 'START'
-                    current_lexeme = ""
-                    current_pos = Position(current_pos.line + 1, 1, current_pos.index)
+                # Procesar delimitadores
+                if char in '(){}[],:;.':
+                    self.tokens.append(Token(TokenType.DELIMITER, char, 
+                        Position(line_num, i + 1, current_pos.index + i)))
+                    i += 1
+                    continue
+                
+                # Carácter no reconocido
+                self._add_error(f"Carácter no reconocido: '{char}'", 
+                    Position(line_num, i + 1, current_pos.index + i))
+                i += 1
             
-            elif state == 'COMMENT':
-                if char == '\n':
-                    self.tokens.append(Token(TokenType.COMMENT, current_lexeme, current_pos))
-                    current_pos = Position(current_pos.line + 1, 1, current_pos.index + 1)
-                    state = 'START'
-                    current_lexeme = ""
-                else:
-                    current_lexeme += char
-                    current_pos = Position(current_pos.line, current_pos.column + 1, current_pos.index + 1)
+            # Agregar token de nueva línea al final de cada línea
+            self.tokens.append(Token(TokenType.NEWLINE, '\n', 
+                Position(line_num, len(line) + 1, current_pos.index + len(line))))
+            current_pos = Position(line_num + 1, 1, current_pos.index + len(line) + 1)
         
-        # Handle any remaining lexeme
-        if current_lexeme:
-            if state == 'STRING':
-                self._add_error("Unterminated string literal", current_pos)
-            elif state == 'COMMENT':
-                self.tokens.append(Token(TokenType.COMMENT, current_lexeme, current_pos))
-            elif state in ['IDENTIFIER', 'NUMBER', 'OPERATOR']:
-                self.tokens.append(Token(TokenType.IDENTIFIER, current_lexeme, current_pos))
+        # Agregar DEDENT tokens al final si es necesario
+        while len(self.indent_stack) > 1:
+            self.indent_stack.pop()
+            self.tokens.append(Token(TokenType.DEDENT, "", current_pos))
         
-        # Add EOF token
-        self.tokens.append(Token(TokenType.EOF, '', current_pos))
+        # Agregar token EOF
+        self.tokens.append(Token(TokenType.EOF, "", current_pos))
+        
         return self.tokens
     
     def _add_error(self, message: str, position: Position):
