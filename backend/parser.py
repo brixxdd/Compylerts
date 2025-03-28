@@ -111,6 +111,11 @@ class Parser:
             # Verificar que se cierre el paréntesis
             self.consume(TokenType.DELIMITER, "Se esperaba ')' después de los parámetros")
             
+            # Verificar si hay un type hint para el valor de retorno
+            tipo_retorno = None
+            if self.match_token(TokenType.OPERATOR, "->"):
+                tipo_retorno = self.tipo()
+            
             # Verificar los dos puntos después de la declaración de función
             self.consume(TokenType.DELIMITER, "Se esperaba ':' después de la declaración de función")
             
@@ -119,7 +124,7 @@ class Parser:
                 self.advance()
             
             # Ahora debería haber un token INDENT
-            return FunDecl(nombre, parametros, None, self.bloque())
+            return FunDecl(nombre, parametros, tipo_retorno, self.bloque())
         except SyntaxError as e:
             self.errors.append(e)
             self.synchronize()
@@ -127,19 +132,37 @@ class Parser:
 
     def params(self):
         """
-        PARAMS → [IDENTIFICADOR ("," IDENTIFICADOR)*]
+        PARAMS → [PARAM ("," PARAM)*]
+        PARAM → IDENTIFICADOR [":" TIPO]
         """
         parametros = []
-        parametros.append(self.consume(TokenType.IDENTIFIER, "Se esperaba nombre de parámetro").value)
         
+        # Obtener el primer parámetro
+        param_token = self.consume(TokenType.IDENTIFIER, "Se esperaba nombre de parámetro")
+        param_name = param_token.value
+        
+        # Verificar si hay un type hint para este parámetro
+        if self.match_token(TokenType.DELIMITER, ":"):
+            # Consumir el tipo y descartarlo (no lo usamos en el AST por ahora)
+            self.consume(TokenType.TYPE_HINT, "Se esperaba un tipo después de ':'")
+        
+        parametros.append(param_name)
+        
+        # Procesar parámetros adicionales
         while self.match_token(TokenType.DELIMITER, ","):
             # Verificar que no haya coma extra antes del cierre
             if self.check_token(TokenType.DELIMITER, ")"):
                 raise self.error(self.previous(), "Coma extra antes del cierre de paréntesis")
             
-            parametros.append(
-                self.consume(TokenType.IDENTIFIER, "Se esperaba nombre de parámetro después de ','").value
-            )
+            param_token = self.consume(TokenType.IDENTIFIER, "Se esperaba nombre de parámetro después de ','")
+            param_name = param_token.value
+            
+            # Verificar si hay un type hint para este parámetro
+            if self.match_token(TokenType.DELIMITER, ":"):
+                # Consumir el tipo y descartarlo (no lo usamos en el AST por ahora)
+                self.consume(TokenType.TYPE_HINT, "Se esperaba un tipo después de ':'")
+            
+            parametros.append(param_name)
         
         return parametros
 
@@ -275,6 +298,11 @@ class Parser:
             # Verificar si es una llamada a función
             if self.check_token(TokenType.DELIMITER, "("):
                 return self.finalizar_llamada(Identifier(name))
+            
+            # Verificar si es una f-string (identificador 'f' seguido de una cadena)
+            if name == "f" and self.check(TokenType.STRING):
+                string_value = self.advance().value
+                return Literal(string_value[1:-1])  # Quitar comillas
             
             return Identifier(name)
         
