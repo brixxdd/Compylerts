@@ -1,46 +1,54 @@
+import ply.lex as lex
 import enum
-import re
 from dataclasses import dataclass
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional, Dict
 from colorama import init, Fore, Style
 
-# Initialize colorama for colored output
+# Inicializa colorama para salida coloreada
 init()
 
 class TokenType(enum.Enum):
-    """Comprehensive enumeration of token types"""
+    """Tipos de tokens soportados"""
     KEYWORD = 'keyword'
     IDENTIFIER = 'identifier'
-    STRING = 'string'
     NUMBER = 'number'
+    STRING = 'string'
     OPERATOR = 'operator'
     DELIMITER = 'delimiter'
     COMMENT = 'comment'
-    DECORATOR = 'decorator'
-    TYPE_HINT = 'type_hint'
-    WHITESPACE = 'whitespace'
+    NEWLINE = 'newline'
     ERROR = 'error'
-    EOF = 'eof'
+    TYPE_HINT = 'type_hint'
+    TEMPLATE_STRING = 'template_string'
+    DECORATOR = 'decorator'
+    ARROW = 'arrow'
+    ASYNC = 'async'
     INDENT = 'indent'
     DEDENT = 'dedent'
-    NEWLINE = 'newline'
+    WHITESPACE = 'whitespace'
+    EOF = 'eof'
 
 @dataclass
 class Position:
-    """Represents a position in the source code"""
+    """Posición de un token en el código fuente"""
     line: int
     column: int
-    index: int
+    index: int = 0  # Posición absoluta en el archivo (opcional)
+    filename: str = ""  # Nombre del archivo (opcional)
+
+    def __str__(self):
+        return f"{self.filename}:{self.line}:{self.column}" if self.filename else f"{self.line}:{self.column}"
 
 @dataclass
 class Token:
-    """Represents a token in the source code"""
+    """Representa un token en el código fuente"""
     type: TokenType
     value: str
     position: Position
+    error_message: Optional[str] = None
 
     def __str__(self):
-        """Colored string representation of the token"""
+        """Representación del token con color"""
         color_map = {
             TokenType.KEYWORD: Fore.BLUE,
             TokenType.IDENTIFIER: Fore.GREEN,
@@ -51,359 +59,366 @@ class Token:
             TokenType.COMMENT: Fore.CYAN,
             TokenType.DECORATOR: Fore.MAGENTA,
             TokenType.TYPE_HINT: Fore.CYAN,
-            TokenType.ERROR: Fore.RED
+            TokenType.ERROR: Fore.RED,
+            TokenType.ARROW: Fore.RED,
+            TokenType.TEMPLATE_STRING: Fore.YELLOW,
+            TokenType.ASYNC: Fore.BLUE
         }
         color = color_map.get(self.type, Fore.WHITE)
-        return f"{color}{self.value}{Style.RESET_ALL}"
+        base = f"{color}{self.value}{Style.RESET_ALL}"
+        if self.error_message:
+            return f"{base} {Fore.RED}// Error: {self.error_message}{Style.RESET_ALL}"
+        return base
 
 class LexicalError(Exception):
-    """Custom exception for lexical errors"""
+    """Excepción para errores léxicos"""
     def __init__(self, message: str, position: Position):
         self.message = message
         self.position = position
-        super().__init__(f"Lexical Error at line {position.line}, column {position.column}: {message}")
+        super().__init__(f"{message} at {position}")
 
 class LexicalAnalyzer:
-    """Advanced Lexical Analyzer with Enhanced Python Syntax Support"""
-    
-    # Actualizar las constantes al inicio de la clase
-    KEYWORDS = {'def', 'return', 'if', 'else', 'while', 'for', 'in', 'True', 'False', 'None', 'class', 'print', 'and', 'or', 'not'}
-    TYPE_HINTS = {'int', 'str', 'float', 'bool', 'list', 'dict', 'tuple', 'set'}
-    OPERATORS = {
-        # Operadores aritméticos
-        '+', '-', '*', '/', '//', '%', '**',
-        # Operadores de comparación
-        '==', '!=', '<', '>', '<=', '>=',
-        # Operadores de asignación
-        '=', '+=', '-=', '*=', '/=', '//=', '%=',
-        # Operadores bit a bit
-        '&', '|', '^', '~', '<<', '>>',
-        # Operadores especiales
-        '->', '=>', ':=',  # Añadimos la flecha para type hints
-    }
-    TYPO_DICTIONARY = {
-        # Errores comunes en inglés
-        'pritn': 'print',
-        'lenght': 'length',
-        'defien': 'define',
-        'retrun': 'return',
-        'functoin': 'function',
-        'whiel': 'while',
-        'ture': 'True',
-        'flase': 'False',
-        'improt': 'import',
-        'fro': 'for',
-        'fi': 'if',
-        'esle': 'else',
-        'rnage': 'range',
-        'calss': 'class',
-        'dfe': 'def',
-        'slef': 'self',
-        'yeild': 'yield',
-        'finaly': 'finally',
-        'excpet': 'except',
-        'raisee': 'raise',
-        'contineu': 'continue',
-        'brak': 'break',
-        'imoprt': 'import',
-        'wirte': 'write',
-        'raed': 'read',
-        'appned': 'append',
-        'inster': 'insert',
-        'remvoe': 'remove',
-        'dictonary': 'dictionary',
-        'lisst': 'list',
-        'sett': 'set',
-        'touple': 'tuple',
-        'booleen': 'boolean',
-        'intger': 'integer',
-        'floot': 'float',
-        'strig': 'string',
-        'globel': 'global',
-        'locla': 'local',
-        'nonlocla': 'nonlocal',
-        'lamda': 'lambda',
-        'asert': 'assert',
-        'delte': 'delete',
-        'tyr': 'try',
-        'wiht': 'with',
-        'yiled': 'yield',
-        'passs': 'pass',
-        'contniue': 'continue',
-        'imprt': 'import',
-        'fromm': 'from',
-        'ass': 'as',
-        'iff': 'if',
-        'eliif': 'elif',
-        'ellse': 'else',
-        'whille': 'while',
-        'forr': 'for',
-        'inn': 'in',
-        'iss': 'is',
-        'nott': 'not',
-        'andd': 'and',
-        'orr': 'or',
-        
-        # Errores comunes en español
-        'imprimir': 'print',
-        'si': 'if',
-        'sino': 'else',
-        'para': 'for',
-        'mientras': 'while',
-        'retornar': 'return',
-        'definir': 'def',
-        'clase': 'class',
-        'verdadero': 'True',
-        'falso': 'False',
-        'importar': 'import',
-        'rango': 'range',
-        'escribir': 'write',
-        'leer': 'read',
-        'funcion': 'function',
-        'variable': 'var',
-        'entero': 'int',
-        'flotante': 'float',
-        'cadena': 'string',
-        'booleano': 'bool',
-        'lista': 'list',
-        'diccionario': 'dict',
-        'tupla': 'tuple',
-        'conjunto': 'set',
-        'nulo': 'None',
-        'intentar': 'try',
-        'excepto': 'except',
-        'finalmente': 'finally',
-        'con': 'with',
-        'como': 'as',
-        'desde': 'from',
-        'continuar': 'continue',
-        'romper': 'break',
-        'pasar': 'pass',
-        'global': 'global',
-        'local': 'local',
-        'nolocal': 'nonlocal',
-        'lambda': 'lambda',
-        'afirmar': 'assert',
-        'eliminar': 'del',
-        'producir': 'yield',
-        'retorno': 'return',
-        'imprima': 'print',
-        'defina': 'def',
-        'retorne': 'return'
+    """Analizador léxico usando PLY"""
+
+    # Lista de tokens para PLY
+    tokens = (
+        'KEYWORD',
+        'IDENTIFIER',
+        'STRING',
+        'NUMBER',
+        'OPERATOR',
+        'DELIMITER',
+        'COMMENT',
+        'DECORATOR',
+        'TYPE_HINT',
+        'WHITESPACE',
+        'ERROR',
+        'EOF',
+        'INDENT',
+        'DEDENT',
+        'NEWLINE',
+        'ARROW',
+        'TEMPLATE_STRING',
+        'ASYNC'
+    )
+
+    # Palabras reservadas
+    keywords = {
+        'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger',
+        'default', 'delete', 'do', 'else', 'enum', 'export', 'extends',
+        'false', 'finally', 'for', 'function', 'if', 'import', 'in',
+        'instanceof', 'new', 'null', 'return', 'super', 'switch', 'this',
+        'throw', 'true', 'try', 'typeof', 'var', 'void', 'while', 'with',
+        'as', 'implements', 'interface', 'let', 'package', 'private',
+        'protected', 'public', 'static', 'yield', 'any', 'boolean', 'constructor',
+        'declare', 'get', 'module', 'require', 'set', 'symbol', 'type',
+        'from', 'of', 'async', 'await',
+        'def', 'return', 'if', 'else', 'elif', 'while', 'for', 'in', 'True', 'False', 'None',
+        'interface', 'type', 'enum', 'implements', 'extends', 'private', 'public', 'protected', 'readonly'
     }
 
-    def __init__(self):
-        self.source_code = ""
-        self.tokens = []
+    # Tipos soportados
+    type_hints = {
+        # Python types
+        'int', 'str', 'float', 'bool', 'list', 'dict', 'tuple', 'set',
+        # TypeScript types
+        'number', 'string', 'boolean', 'any', 'void', 'never', 'object',
+        'Array', 'Record', 'Partial', 'Required', 'Pick', 'Omit',
+        # Additional TypeScript types
+        'undefined', 'null', 'unknown', 'bigint', 'symbol',
+        'Promise', 'Map', 'Set', 'Date', 'RegExp'
+    }
+
+    # Operadores válidos
+    valid_operators = {
+        '=',  # Asignación simple
+        '+', '-', '*', '/', '%',  # Aritméticos básicos
+        '+=', '-=', '*=', '/=', '%=',  # Asignación compuesta
+        '==', '!=', '<', '<=', '>', '>=',  # Comparación
+        '**', '//',  # Potencia y división entera
+        '??', '?.',  # Operadores de TypeScript
+        '!.',  # Operador de no-nulo TypeScript
+        '->'  # Operador de tipo de retorno Python
+    }
+
+    # Reglas de tokens simples
+    t_DELIMITER = r'[(){}\[\],.:;?@]'
+    t_ignore = ' \t\r'
+
+    def __init__(self, filename: Optional[str] = None):
+        self.lexer = None
+        self.tokens_list = []
         self.errors = []
-        self.indent_stack = [0]  # Para rastrear niveles de indentación
-        
-    def handle_indentation(self, line: str, line_number: int) -> int:
+        self.filename = filename
+        self.indent_stack = [0]  # Para manejar indentación
+        self.current_line = 1
+        self.current_column = 1
+        # Inicializa el lexer
+        self.lexer = lex.lex(module=self)
+
+    def find_column(self, token):
         """
-        Maneja la indentación al inicio de una línea
-        Retorna el número de espacios de indentación
+        Encuentra la columna donde comienza el token.
+        Cuenta los caracteres desde el último salto de línea.
         """
-        indent = len(line) - len(line.lstrip())
-        if indent % 4 != 0:  # Python usa 4 espacios por nivel
-            self._add_error(
-                f"Indentación inválida: {indent} espacios (debe ser múltiplo de 4)",
-                Position(line_number, 1, 0)
-            )
-        return indent
+        last_cr = self.lexer.lexdata.rfind('\n', 0, token.lexpos)
+        if last_cr < 0:
+            last_cr = 0
+        column = (token.lexpos - last_cr)
+        return column
+
+    def get_position(self, token) -> Position:
+        """Obtiene la posición (línea, columna) de un token"""
+        return Position(
+            line=token.lineno,
+            column=self.find_column(token),
+            index=token.lexpos,
+            filename=self.filename
+        )
 
     def tokenize(self, source_code: str) -> List[Token]:
-        self.source_code = source_code
-        self.tokens = []
+        """Tokeniza el código fuente usando PLY"""
+        self.tokens_list = []
         self.errors = []
-        self.indent_stack = [0]  # Reiniciar la pila de indentación
-        current_pos = Position(1, 1, 0)
+        self.lexer.input(source_code)
         
-        lines = source_code.split('\n')
-        for line_num, line in enumerate(lines, 1):
-            # Calcular la indentación actual
-            indent = len(line) - len(line.lstrip())
-            current_indent_pos = Position(line_num, 1, current_pos.index)
+        # Estado para validación de parámetros de función
+        in_params = False
+        param_tokens = []
+        current_param = []
+        last_token_type = None
+        
+        while True:
+            tok = self.lexer.token()
+            if not tok:
+                break
+
+            # Crear token con posición
+            token = Token(
+                type=TokenType(tok.type.lower()),
+                value=tok.value,
+                position=self.get_position(tok)
+            )
             
-            # Procesar indentación solo si la línea no está vacía
-            if line.strip():
-                # Comparar con el nivel de indentación actual
-                if indent > self.indent_stack[-1]:
-                    # Aumentar indentación
-                    self.indent_stack.append(indent)
-                    self.tokens.append(Token(TokenType.INDENT, " " * indent, current_indent_pos))
-                elif indent < self.indent_stack[-1]:
-                    # Disminuir indentación, posiblemente varias veces
-                    while indent < self.indent_stack[-1]:
-                        self.indent_stack.pop()
-                        self.tokens.append(Token(TokenType.DEDENT, "", current_indent_pos))
-                    
-                    # Verificar que la indentación coincida con algún nivel anterior
-                    if indent != self.indent_stack[-1]:
-                        self._add_error(
-                            f"Indentación inconsistente: {indent} espacios no coincide con ningún nivel anterior",
-                            current_indent_pos
+            # Validación de parámetros de función
+            if token.value == '(':
+                in_params = True
+                param_tokens = []
+                current_param = []
+            elif token.value == ')':
+                in_params = False
+                # Verificar el último parámetro
+                if current_param:
+                    param_tokens.append(current_param)
+                # Validar parámetros
+                self._validate_parameters(param_tokens)
+            elif in_params:
+                if token.type in [TokenType.COMMENT, TokenType.NEWLINE]:
+                    continue
+                
+                # Detectar parámetros consecutivos sin coma
+                if token.type in [TokenType.IDENTIFIER, TokenType.TYPE_HINT]:
+                    if last_token_type in [TokenType.IDENTIFIER, TokenType.TYPE_HINT]:
+                        # Si tenemos dos identificadores o tipos consecutivos sin coma
+                        error = LexicalError(
+                            "Falta una coma entre parámetros",
+                            token.position
                         )
+                        self.errors.append(error)
                 
-                # Procesar el contenido de la línea
-                i = indent  # Comenzar después de la indentación
-                while i < len(line):
-                    char = line[i]
-                    
-                    # Saltar espacios en blanco
-                    if char.isspace():
-                        i += 1
-                        continue
-                    
-                    # Procesar comentarios
-                    if char == '#':
-                        comment = line[i:]
-                        self.tokens.append(Token(TokenType.COMMENT, comment, 
-                            Position(line_num, i + 1, current_pos.index + i)))
-                        break
-                    
-                    # Procesar strings
-                    if char in '"\'':
-                        string_start = i
-                        quote = char
-                        i += 1
-                        while i < len(line) and line[i] != quote:
-                            if line[i] == '\\':
-                                i += 2
-                            else:
-                                i += 1
-                        if i >= len(line):
-                            self._add_error("String sin terminar", 
-                                Position(line_num, string_start + 1, current_pos.index + string_start))
-                        else:
-                            self.tokens.append(Token(TokenType.STRING, line[string_start:i+1], 
-                                Position(line_num, string_start + 1, current_pos.index + string_start)))
-                            i += 1
-                        continue
-                    
-                    # Procesar números
-                    if char.isdigit():
-                        num_start = i
-                        while i < len(line) and (line[i].isdigit() or line[i] == '.'):
-                            i += 1
-                        self.tokens.append(Token(TokenType.NUMBER, line[num_start:i], 
-                            Position(line_num, num_start + 1, current_pos.index + num_start)))
-                        continue
-                    
-                    # Procesar identificadores y palabras clave
-                    if char.isalpha() or char == '_':
-                        id_start = i
-                        while i < len(line) and (line[i].isalnum() or line[i] == '_'):
-                            i += 1
-                        word = line[id_start:i]
-                        
-                        # Verificar si el identificador contiene caracteres no ASCII
-                        if not all(ord(c) < 128 for c in word):
-                            self._add_error(
-                                f"Identificador inválido: '{word}'. Los identificadores solo pueden contener caracteres ASCII alfanuméricos y guiones bajos.",
-                                Position(line_num, id_start + 1, current_pos.index + id_start)
-                            )
-                        # Verificar si es una palabra clave
-                        elif word in self.KEYWORDS:
-                            self.tokens.append(Token(TokenType.KEYWORD, word, 
-                                Position(line_num, id_start + 1, current_pos.index + id_start)))
-                        # Verificar si es un type hint
-                        elif word in self.TYPE_HINTS:
-                            self.tokens.append(Token(TokenType.TYPE_HINT, word, 
-                                Position(line_num, id_start + 1, current_pos.index + id_start)))
-                        # Es un identificador
-                        else:
-                            if word in self.TYPO_DICTIONARY:
-                                self._add_error(
-                                    f"Posible error tipográfico: '{word}'. ¿Quisiste decir '{self.TYPO_DICTIONARY[word]}'?",
-                                    Position(line_num, id_start + 1, current_pos.index + id_start)
-                                )
-                            self.tokens.append(Token(TokenType.IDENTIFIER, word, 
-                                Position(line_num, id_start + 1, current_pos.index + id_start)))
-                        continue
-                    
-                    # Procesar operadores y delimitadores
-                    if char in '+-*/%=<>!&|^~':
-                        # Verificar operadores de dos caracteres
-                        if i + 1 < len(line) and line[i:i+2] in self.OPERATORS:
-                            self.tokens.append(Token(TokenType.OPERATOR, line[i:i+2], 
-                                Position(line_num, i + 1, current_pos.index + i)))
-                            i += 2
-                        else:
-                            # Asegurarse de que el operador '=' se tokenice correctamente
-                            if char == '=':
-                                self.tokens.append(Token(TokenType.OPERATOR, '=', 
-                                    Position(line_num, i + 1, current_pos.index + i)))
-                            else:
-                                self.tokens.append(Token(TokenType.OPERATOR, char, 
-                                    Position(line_num, i + 1, current_pos.index + i)))
-                            i += 1
-                        continue
-                    
-                    # Procesar delimitadores
-                    if char in '(){}[],:;.':
-                        self.tokens.append(Token(TokenType.DELIMITER, char, 
-                            Position(line_num, i + 1, current_pos.index + i)))
-                        i += 1
-                        continue
-                    
-                    # Carácter no reconocido
-                    self._add_error(f"Carácter no reconocido: '{char}'", 
-                        Position(line_num, i + 1, current_pos.index + i))
-                    i += 1
+                if token.value == ',':
+                    if current_param:
+                        param_tokens.append(current_param)
+                        current_param = []
+                else:
+                    current_param.append(token)
                 
-            # Agregar token de nueva línea al final de cada línea
-            self.tokens.append(Token(TokenType.NEWLINE, '\n', 
-                Position(line_num, len(line) + 1, current_pos.index + len(line))))
-            current_pos = Position(line_num + 1, 1, current_pos.index + len(line) + 1)
+                last_token_type = token.type
+            
+            self.tokens_list.append(token)
+            
+        return self.tokens_list
+
+    def _validate_parameters(self, param_tokens):
+        """Valida la sintaxis de los parámetros de función"""
+        for i, param in enumerate(param_tokens):
+            # Verificar que cada parámetro tenga la forma correcta (identificador: tipo)
+            if len(param) >= 2:
+                if not (param[0].type == TokenType.IDENTIFIER and 
+                       param[1].type == TokenType.DELIMITER and 
+                       param[1].value == ':'):
+                    error = LexicalError(
+                        "Parámetro mal formado",
+                        param[0].position
+                    )
+                    self.errors.append(error)
+
+    def t_OPERATOR(self, t):
+        r'->|=|[+\-*/%]=?|==|!=|<=?|>=?|\*\*|\/\/|\?\?|\?\.|\!\.'
+        if t.value not in self.valid_operators:
+            error = LexicalError(f"Operador inválido '{t.value}'", self.get_position(t))
+            self.errors.append(error)
+            t.type = 'ERROR'
+        return t
+
+    def t_error(self, t):
+        """Manejo de caracteres ilegales"""
+        # Caracteres especiales no permitidos
+        special_chars = {'!', '@', '#', '$', '%', '^', '&', '~'}
+        if t.value[0] in special_chars:
+            error = LexicalError(f"Caracter especial no permitido '{t.value[0]}'", self.get_position(t))
+            self.errors.append(error)
+        elif not self._is_valid_unicode(t.value[0]):
+            error = LexicalError(f"Caracter ilegal '{t.value[0]}'", self.get_position(t))
+            self.errors.append(error)
+        t.type = 'ERROR'
+        t.value = t.value[0]
+        t.lexer.skip(1)
+        return t
+
+    def t_ARROW(self, t):
+        r'->'
+        return t
+
+    def t_TEMPLATE_STRING(self, t):
+        r'f"[^"]*"|f\'[^\']*\''
+        # Validar que el template string esté bien formado
+        value = t.value[2:-1]  # Quitar f" y "
+        try:
+            # Verificar balance de llaves
+            stack = []
+            in_expr = False
+            for char in value:
+                if char == '{':
+                    if in_expr:
+                        raise ValueError("Llaves anidadas no permitidas")
+                    stack.append(char)
+                    in_expr = True
+                elif char == '}':
+                    if not in_expr:
+                        raise ValueError("Llave de cierre sin apertura")
+                    stack.pop()
+                    in_expr = False
+            
+            if stack or in_expr:
+                raise ValueError("Llaves no balanceadas")
+            
+            return t
+        except (ValueError, IndexError) as e:
+            error = LexicalError(f"Template string mal formado: {str(e)}", self.get_position(t))
+            self.errors.append(error)
+            t.type = 'ERROR'
+            return t
+
+    def t_DECORATOR(self, t):
+        r'@[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*(\([^)]*\))?'
+        return t
+
+    def t_IDENTIFIER(self, t):
+        r'[a-zA-Z_\u00C0-\u00FF][a-zA-Z0-9_\u00C0-\u00FF]*'
+        # Verificar si es una palabra clave
+        if t.value in self.keywords:
+            t.type = 'KEYWORD'
+        # Verificar si es un tipo
+        elif t.value in self.type_hints:
+            t.type = 'TYPE_HINT'
+        # Verificar si es async/await
+        elif t.value in ['async', 'await']:
+            t.type = 'ASYNC'
+        return t
+
+    def t_NUMBER(self, t):
+        r'\d*\.\d+|\d+'
+        try:
+            float(t.value)  # Valida que sea un número válido
+            return t
+        except ValueError:
+            error = LexicalError(f"Número inválido: {t.value}", self.get_position(t))
+            self.errors.append(error)
+            t.type = 'ERROR'
+            return t
+
+    def t_STRING(self, t):
+        r'"""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\'|"[^"]*"|\'[^\']*\''
+        return t
+
+    def t_COMMENT(self, t):
+        r'[#].*|//.*'  # Soporta comentarios de Python (#) y TypeScript (//)
+        t.value = t.value.strip()
+        return t
+
+    def t_newline(self, t):
+        r'\n+'
+        t.type = 'NEWLINE'
+        t.lexer.lineno += len(t.value)
+        return t
+
+    def print_tokens(self, show_position: bool = True):
+        """Imprime todos los tokens con color y opcionalmente su posición"""
+        print(f"\n{Fore.CYAN}🔍 Análisis Léxico{Style.RESET_ALL}")
+        print("=" * 80)
         
-        # Agregar DEDENT tokens al final si es necesario
-        while len(self.indent_stack) > 1:
-            self.indent_stack.pop()
-            self.tokens.append(Token(TokenType.DEDENT, "", current_pos))
+        # Agrupar tokens por línea
+        tokens_by_line = {}
+        for token in self.tokens_list:
+            line = token.position.line
+            if line not in tokens_by_line:
+                tokens_by_line[line] = []
+            tokens_by_line[line].append(token)
         
-        # Agregar token EOF
-        self.tokens.append(Token(TokenType.EOF, "", current_pos))
-        
-        return self.tokens
-    
-    def _add_error(self, message: str, position: Position):
-        """Add a lexical error"""
-        # Traducir mensajes comunes al español
-        if message.startswith("Unrecognized character"):
-            char = message.split("'")[1]
-            message = f"Carácter no reconocido: '{char}'"
-        elif message.startswith("Unterminated string literal"):
-            message = "Cadena de texto sin terminar"
-        elif message.startswith("Unterminated f-string"):
-            message = "f-string sin terminar"
-        elif message.startswith("Expected string delimiter"):
-            char = message.split("'")[3]
-            message = f"Se esperaba un delimitador de cadena después de 'f', se encontró '{char}'"
-        elif message.startswith("Possible typo"):
-            parts = message.split("'")
-            if len(parts) >= 4:
-                word = parts[1]
-                suggestion = parts[3]
-                message = f"Posible error tipográfico: '{word}'. ¿Quisiste decir '{suggestion}'?"
-        
-        error = {
-            'message': message,
-            'line': position.line,
-            'column': position.column
-        }
-        self.errors.append(error)
-        
-    def print_tokens(self):
-        """Print all tokens with color"""
-        print(f"{Fore.CYAN}🔍 Tokens Encontrados:{Style.RESET_ALL}")
-        for token in self.tokens:
-            print(f"{token} [{token.type.value}]")
+        # Imprimir tokens organizados por línea
+        print(f"{Fore.CYAN}Tokens encontrados por línea:{Style.RESET_ALL}")
+        for line in sorted(tokens_by_line.keys()):
+            print(f"\n{Fore.YELLOW}Línea {line}:{Style.RESET_ALL}")
+            for token in tokens_by_line[line]:
+                token_info = f"  {token.type.value:12} │ {token.value}"
+                if show_position:
+                    token_info += f" @ columna {token.position.column}"
+                print(token_info)
     
     def print_errors(self):
-        """Print lexical errors"""
+        """Imprime errores léxicos organizados"""
         if self.errors:
-            print(f"\n{Fore.RED}❌ Errores Léxicos:{Style.RESET_ALL}")
+            print(f"\n{Fore.RED}❌ Errores Léxicos Encontrados:{Style.RESET_ALL}")
+            print("=" * 80)
+            
+            # Agrupar errores por línea
+            errors_by_line = {}
             for error in self.errors:
-                print(f"Línea {error['line']}, Columna {error['column']}: {error['message']}")
+                if isinstance(error, LexicalError):
+                    line = error.position.line
+                    if line not in errors_by_line:
+                        errors_by_line[line] = []
+                    errors_by_line[line].append(error)
+                else:
+                    # Para errores que no son LexicalError
+                    if 0 not in errors_by_line:
+                        errors_by_line[0] = []
+                    errors_by_line[0].append(error)
+            
+            # Imprimir errores organizados por línea
+            for line in sorted(errors_by_line.keys()):
+                if line == 0:
+                    print(f"\n{Fore.RED}Errores generales:{Style.RESET_ALL}")
+                else:
+                    print(f"\n{Fore.RED}Línea {line}:{Style.RESET_ALL}")
+                
+                for error in errors_by_line[line]:
+                    if isinstance(error, LexicalError):
+                        print(f"  • {error.message}")
+                        print(f"    └─ Columna {error.position.column}")
+                    else:
+                        print(f"  • {str(error)}")
         else:
             print(f"\n{Fore.GREEN}✅ No se encontraron errores léxicos{Style.RESET_ALL}")
+            print("=" * 80)
+
+    def _is_valid_unicode(self, char):
+        """Verifica si un caracter es Unicode válido para identificadores"""
+        # Permitir letras Unicode en el rango Latin-1 Supplement
+        if '\u00C0' <= char <= '\u00FF':
+            return True
+        # Permitir caracteres ASCII básicos
+        if ord(char) < 128:
+            return True
+        return False
