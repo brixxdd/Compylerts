@@ -27,6 +27,7 @@ class TokenType(enum.Enum):
     DEDENT = 'dedent'
     WHITESPACE = 'whitespace'
     EOF = 'eof'
+    SIMPLE_STRING = 'simple_string'
 
 @dataclass
 class Position:
@@ -62,7 +63,8 @@ class Token:
             TokenType.ERROR: Fore.RED,
             TokenType.ARROW: Fore.RED,
             TokenType.TEMPLATE_STRING: Fore.YELLOW,
-            TokenType.ASYNC: Fore.BLUE
+            TokenType.ASYNC: Fore.BLUE,
+            TokenType.SIMPLE_STRING: Fore.YELLOW
         }
         color = color_map.get(self.type, Fore.WHITE)
         base = f"{color}{self.value}{Style.RESET_ALL}"
@@ -99,7 +101,8 @@ class LexicalAnalyzer:
         'NEWLINE',
         'ARROW',
         'TEMPLATE_STRING',
-        'ASYNC'
+        'ASYNC',
+        'SIMPLE_STRING'
     )
 
     # Palabras reservadas
@@ -182,11 +185,14 @@ class LexicalAnalyzer:
         self.errors = []
         self.lexer.input(source_code)
         
-        # Estado para validación de parámetros de función
+        # Estados para validación
         in_params = False
         param_tokens = []
         current_param = []
-        last_token_type = None
+        expect_param_type = False
+        expect_function_colon = False
+        after_return_type = False
+        last_param_token = None  # Para validar comas entre parámetros
         
         while True:
             tok = self.lexer.token()
@@ -205,35 +211,62 @@ class LexicalAnalyzer:
                 in_params = True
                 param_tokens = []
                 current_param = []
+                expect_param_type = False
+                last_param_token = None
             elif token.value == ')':
                 in_params = False
-                # Verificar el último parámetro
                 if current_param:
                     param_tokens.append(current_param)
-                # Validar parámetros
-                self._validate_parameters(param_tokens)
             elif in_params:
                 if token.type in [TokenType.COMMENT, TokenType.NEWLINE]:
                     continue
-                
-                # Detectar parámetros consecutivos sin coma
-                if token.type in [TokenType.IDENTIFIER, TokenType.TYPE_HINT]:
-                    if last_token_type in [TokenType.IDENTIFIER, TokenType.TYPE_HINT]:
-                        # Si tenemos dos identificadores o tipos consecutivos sin coma
-                        error = LexicalError(
-                            "Falta una coma entre parámetros",
-                            token.position
-                        )
-                        self.errors.append(error)
                 
                 if token.value == ',':
                     if current_param:
                         param_tokens.append(current_param)
                         current_param = []
+                        expect_param_type = False
+                    last_param_token = None
                 else:
+                    # Validar comas entre parámetros
+                    if token.type == TokenType.IDENTIFIER:
+                        if last_param_token and last_param_token.type == TokenType.TYPE_HINT:
+                            error = LexicalError(
+                                "Falta una coma entre parámetros",
+                                token.position
+                            )
+                            self.errors.append(error)
+                    
                     current_param.append(token)
-                
-                last_token_type = token.type
+                    last_param_token = token
+
+            # Validación de definición de función
+            if token.type == TokenType.KEYWORD and token.value == 'def':
+                expect_function_colon = True
+            elif expect_function_colon:
+                if token.type == TokenType.OPERATOR and token.value == '->':
+                    after_return_type = True
+                elif after_return_type and token.type == TokenType.TYPE_HINT:
+                    # Después del tipo de retorno, debe venir un :
+                    next_token = self.lexer.token()
+                    if not next_token or next_token.type.lower() != 'delimiter' or next_token.value != ':':
+                        error = LexicalError(
+                            "Falta el ':' después de la definición de función",
+                            token.position
+                        )
+                        self.errors.append(error)
+                    else:
+                        # No olvidar procesar el token que acabamos de consumir
+                        self.tokens_list.append(Token(
+                            type=TokenType(next_token.type.lower()),
+                            value=next_token.value,
+                            position=self.get_position(next_token)
+                        ))
+                    expect_function_colon = False
+                    after_return_type = False
+                elif token.type == TokenType.NEWLINE:
+                    expect_function_colon = False
+                    after_return_type = False
             
             self.tokens_list.append(token)
             
@@ -282,33 +315,8 @@ class LexicalAnalyzer:
 
     def t_TEMPLATE_STRING(self, t):
         r'f"[^"]*"|f\'[^\']*\''
-        # Validar que el template string esté bien formado
-        value = t.value[2:-1]  # Quitar f" y "
-        try:
-            # Verificar balance de llaves
-            stack = []
-            in_expr = False
-            for char in value:
-                if char == '{':
-                    if in_expr:
-                        raise ValueError("Llaves anidadas no permitidas")
-                    stack.append(char)
-                    in_expr = True
-                elif char == '}':
-                    if not in_expr:
-                        raise ValueError("Llave de cierre sin apertura")
-                    stack.pop()
-                    in_expr = False
-            
-            if stack or in_expr:
-                raise ValueError("Llaves no balanceadas")
-            
-            return t
-        except (ValueError, IndexError) as e:
-            error = LexicalError(f"Template string mal formado: {str(e)}", self.get_position(t))
-            self.errors.append(error)
-            t.type = 'ERROR'
-            return t
+        t.value = t.value[2:-1]  # Remover f y comillas
+        return t
 
     def t_DECORATOR(self, t):
         r'@[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*(\([^)]*\))?'
@@ -339,7 +347,21 @@ class LexicalAnalyzer:
             return t
 
     def t_STRING(self, t):
-        r'"""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\'|"[^"]*"|\'[^\']*\''
+        r'\"\"\"[\s\S]*?\"\"\"|\'\'\'[\s\S]*?\'\'\'|"[^"]*"|\'[^\']*\''
+        # Detectar si es un docstring (comentario multilinea)
+        if t.value.startswith('"""') or t.value.startswith("'''"):
+            t.type = 'COMMENT'
+            # Preservar el formato del docstring
+            t.value = t.value.strip('"""').strip("'''").strip()
+        else:
+            # String normal
+            t.value = t.value[1:-1]  # Remover comillas
+        return t
+
+    def t_SIMPLE_STRING(self, t):
+        r'"[^"]*"|\'[^\']*\''
+        t.value = t.value[1:-1]  # Remover comillas
+        t.type = 'SIMPLE_STRING'
         return t
 
     def t_COMMENT(self, t):
