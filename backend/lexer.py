@@ -117,7 +117,8 @@ class LexicalAnalyzer:
         'declare', 'get', 'module', 'require', 'set', 'symbol', 'type',
         'from', 'of', 'async', 'await',
         'def', 'return', 'if', 'else', 'elif', 'while', 'for', 'in', 'True', 'False', 'None',
-        'interface', 'type', 'enum', 'implements', 'extends', 'private', 'public', 'protected', 'readonly'
+        'interface', 'type', 'enum', 'implements', 'extends', 'private', 'public', 'protected', 'readonly',
+        'pass', 'break', 'continue'
     }
 
     # Tipos soportados
@@ -185,6 +186,13 @@ class LexicalAnalyzer:
         self.errors = []
         self.lexer.input(source_code)
         
+        # Lista de palabras clave y tipos válidos
+        valid_keywords = ['def', 'return', 'if', 'else', 'while', 'for', 'in', 'print', 'class', 'pass', 'break', 'continue']
+        valid_types = ['int', 'float', 'str', 'bool', 'list', 'dict', 'tuple', 'set']
+        
+        # Lista de palabras comunes que no son palabras clave
+        common_identifiers = {'main', 'base', 'altura', 'area', 'valor', 'resultado', 'nombre', 'suma', 'resta', 'total'}
+        
         # Estados para validación
         in_params = False
         param_tokens = []
@@ -205,6 +213,33 @@ class LexicalAnalyzer:
                 value=tok.value,
                 position=self.get_position(tok)
             )
+            
+            # Validar palabras clave y tipos mal escritos
+            if token.type == TokenType.IDENTIFIER:
+                word = token.value.lower()
+                # Solo buscar palabras clave similares si:
+                # 1. La palabra se parece a una palabra clave (máx 2 cambios)
+                # 2. No es un identificador común
+                # 3. No está en una posición donde se espera un identificador
+                if word not in common_identifiers and not in_params:
+                    similar_keyword = self._find_similar_word(word, valid_keywords)
+                    if similar_keyword and similar_keyword.lower() != word:
+                        error = LexicalError(
+                            f"'{token.value}' no es una palabra clave válida. ¿Quisiste decir '{similar_keyword}'?",
+                            token.position
+                        )
+                        self.errors.append(error)
+                
+                # Validar tipos solo después de : en parámetros o tipo de retorno
+                if (in_params and last_param_token and last_param_token.value == ':') or \
+                   (after_return_type and token.type == TokenType.IDENTIFIER):
+                    similar_type = self._find_similar_word(word, valid_types)
+                    if similar_type and similar_type.lower() != word:
+                        error = LexicalError(
+                            f"'{token.value}' no es un tipo válido. ¿Quisiste decir '{similar_type}'?",
+                            token.position
+                        )
+                        self.errors.append(error)
             
             # Validación de parámetros de función
             if token.value == '(':
@@ -271,6 +306,38 @@ class LexicalAnalyzer:
             self.tokens_list.append(token)
             
         return self.tokens_list
+
+    def _levenshtein_distance(self, s1: str, s2: str) -> int:
+        """Calcula la distancia de Levenshtein entre dos strings"""
+        if len(s1) < len(s2):
+            return self._levenshtein_distance(s2, s1)
+        if len(s2) == 0:
+            return len(s1)
+        
+        previous_row = range(len(s2) + 1)
+        for i, c1 in enumerate(s1):
+            current_row = [i + 1]
+            for j, c2 in enumerate(s2):
+                insertions = previous_row[j + 1] + 1
+                deletions = current_row[j] + 1
+                substitutions = previous_row[j] + (c1 != c2)
+                current_row.append(min(insertions, deletions, substitutions))
+            previous_row = current_row
+        
+        return previous_row[-1]
+
+    def _find_similar_word(self, word: str, valid_words: list) -> str:
+        """Encuentra la palabra más similar de una lista de palabras válidas"""
+        min_distance = float('inf')
+        similar_word = None
+        
+        for valid_word in valid_words:
+            distance = self._levenshtein_distance(word.lower(), valid_word.lower())
+            if distance < min_distance and distance <= 2:  # máximo 2 cambios
+                min_distance = distance
+                similar_word = valid_word
+        
+        return similar_word
 
     def _validate_parameters(self, param_tokens):
         """Valida la sintaxis de los parámetros de función"""
