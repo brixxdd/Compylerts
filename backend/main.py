@@ -20,45 +20,49 @@ def main():
     except EOFError:
         pass
     
-    # Si no hay código, usar un ejemplo
-    if not source_code.strip():
-        source_code = """
-def suma(a: int, b: int) -> int:
-    return a + b
-
-resultado = suma(5, 3)
-print(f"La suma es: {resultado}")
-"""
-        print("Usando código de ejemplo:")
-        print(source_code)
-    
     # Crear instancia del lexer y parser
     lexer = PLYLexer(source_code)
     parser = PLYParser()
     
-    # Realizar análisis
-    parser.parse(source_code)
+    # Realizar el análisis léxico
+    print("\nTokens encontrados:")
+    print("-" * 40)
+    tokens_found = []
+    while True:
+        tok = lexer.token()
+        if not tok:
+            break
+        tokens_found.append(f"{tok.type}: {tok.value}")
     
-    # Obtener errores léxicos
-    lexical_errors = lexer.errors
+    # Mostrar tokens encontrados
+    for token in tokens_found:
+        print(token)
     
-    # Mostrar resultados
-    if lexical_errors:
-        print(f"\n{Fore.RED}❌ Errores Léxicos:{Style.RESET_ALL}")
-        for error in lexical_errors:
-            print(f"  • {error}")
+    # Verificar errores léxicos
+    if lexer.errors:
+        print("\n❌ Errores léxicos:")
+        for error in lexer.errors:
+            print(f"{Fore.RED}{error}{Style.RESET_ALL}")
+        return
+    
+    # Realizar análisis sintáctico
+    result = parser.parse(source_code)
+    
+    # Mostrar errores léxicos primero si existen
+    if lexer.errors:
+        print("\n❌ Errores léxicos:")
+        for error in lexer.errors:
+            print(error)
+        return
+    
+    # Mostrar errores sintácticos si existen
+    if parser.errors:
+        print("\n❌ Errores sintácticos:")
+        for error in parser.errors:
+            print(f"{Fore.RED}{error}{Style.RESET_ALL}")
     else:
-        print(f"\n{Fore.GREEN}✅ No se encontraron errores léxicos{Style.RESET_ALL}")
-    
-    # Filtrar y mostrar errores sintácticos (excluyendo los léxicos)
-    syntax_errors = [error for error in parser.errors if "Posible error tipográfico" not in error]
-    if syntax_errors:
-        print(f"\n{Fore.RED}❌ Errores Sintácticos:{Style.RESET_ALL}")
-        for error in syntax_errors:
-            print(f"{error}")
-            print()  # Línea en blanco para separar errores
-    else:
-        print(f"\n{Fore.GREEN}✅ Análisis sintáctico completado sin errores{Style.RESET_ALL}")
+        print("\n✅ No se encontraron errores léxicos")
+        print("✅ Análisis sintáctico completado sin errores")
     
     print("\n¡Análisis completado!")
 

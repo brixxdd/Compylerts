@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import List, Optional, Any
+from enum import Enum, auto
 
 @dataclass
 class Node:
@@ -104,18 +105,18 @@ class DelimiterError(ErrorStmt):
     found: Optional[str]
 
 # Enumeraciones para operadores
-class BinaryOp:
-    ADD = '+'
-    SUBTRACT = '-'
-    MULTIPLY = '*'
-    DIVIDE = '/'
-    MODULO = '%'
-    EQUAL = '=='
-    NOT_EQUAL = '!='
-    LESS_THAN = '<'
-    GREATER_THAN = '>'
-    LESS_EQUAL = '<='
-    GREATER_EQUAL = '>='
+class BinaryOp(Enum):
+    PLUS = auto()
+    MINUS = auto()
+    MULTIPLY = auto()
+    DIVIDE = auto()
+    MODULO = auto()
+    EQUAL = auto()
+    NOT_EQUAL = auto()
+    LESS = auto()
+    GREATER = auto()
+    LESS_EQUAL = auto()
+    GREATER_EQUAL = auto()
 
 class UnaryOp:
     NEGATE = '-'

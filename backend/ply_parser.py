@@ -45,19 +45,18 @@ class PLYParser:
         try:
             self.lexer = PLYLexer(text)
             
-            # Añadir los errores léxicos a nuestra lista de errores
-            for error in self.lexer.errors:
-                self.errors.append(error)
-                self.valid_code = False  # Si hay errores léxicos, el código no es válido
+            # Si hay errores léxicos, detener el proceso
+            if self.lexer.errors:
+                for error in self.lexer.errors:
+                    self.errors.append(error)
+                return None
             
-            # Si el código parece ser válido, no realizar análisis sintáctico detallado
-            if self.valid_code and self._is_valid_python(text):
-                return Program([])  # Devolver un AST vacío
-            
-            result = self.parser.parse(lexer=self.lexer)
+            # Realizar el análisis sintáctico
+            result = self.parser.parse(lexer=self.lexer, debug=False)
             return result
         except Exception as e:
-            self.add_error(1, f"Error inesperado: {str(e)}")
+            # Eliminar este bloque de manejo de excepción genérica
+            # ya que los errores sintácticos ya son manejados por p_error
             return None
     
     def _extract_user_functions(self, text):
@@ -157,33 +156,13 @@ class PLYParser:
         p[0] = p[1]
     
     def p_function_def(self, p):
-        '''function_def : KEYWORD ID LPAREN parameter_list RPAREN ARROW type COLON NEWLINE INDENT statement_list DEDENT
-                       | KEYWORD ID LPAREN parameter_list RPAREN COLON NEWLINE INDENT statement_list DEDENT
-                       | KEYWORD ID LPAREN RPAREN ARROW type COLON NEWLINE INDENT statement_list DEDENT
-                       | KEYWORD ID LPAREN RPAREN COLON NEWLINE INDENT statement_list DEDENT'''
+        '''function_def : KEYWORD ID LPAREN parameter_list RPAREN type_annotation COLON NEWLINE INDENT statement_list DEDENT
+                       | KEYWORD ID LPAREN RPAREN type_annotation COLON NEWLINE INDENT statement_list DEDENT'''
         if p[1] == 'def':
             name = p[2]
-            
-            # Determinar si hay parámetros
-            if p[4] == ')':  # No hay parámetros
-                params = []
-                # Determinar si hay tipo de retorno
-                if p[5] == '->':
-                    return_type = p[6]
-                    body = p[10]
-                else:
-                    return_type = None
-                    body = p[8]
-            else:  # Hay parámetros
-                params = p[4]
-                # Determinar si hay tipo de retorno
-                if p[6] == '->':
-                    return_type = p[7]
-                    body = p[11]
-                else:
-                    return_type = None
-                    body = p[9]
-            
+            params = [] if p[4] == ')' else p[4]
+            return_type = p[5]
+            body = p[10] if len(p) > 10 else p[9]
             p[0] = FunctionDef(name, params, return_type, body)
     
     def p_parameter_list(self, p):
@@ -309,6 +288,28 @@ class PLYParser:
     def p_call(self, p):
         '''call : ID LPAREN arguments RPAREN
                 | ID LPAREN RPAREN'''
+        func_name = p[1]
+        
+        # Verificar si la función existe
+        if func_name not in self.known_functions and func_name not in self.user_defined_functions:
+            # Buscar funciones similares para sugerir correcciones
+            similar_functions = []
+            for func in self.known_functions:
+                # Mejorar la detección de similitud
+                if abs(len(func) - len(func_name)) <= 2:  # Permitir hasta 2 caracteres de diferencia
+                    # Verificar si las funciones son similares
+                    common_chars = sum(1 for a, b in zip(func_name, func) if a == b)
+                    if common_chars >= len(func_name) - 2:
+                        similar_functions.append(func)
+            
+            suggestion = f"¿Quisiste decir '{similar_functions[0]}'?" if similar_functions else "Verifica el nombre de la función"
+            error_msg = f"""Error sintáctico en línea {p.lineno}: Función '{func_name}' no definida
+En el código:
+    {self.source_lines[p.lineno - 1]}
+    {' ' * self.source_lines[p.lineno - 1].find(func_name)}^ Aquí
+Sugerencia: {suggestion}"""
+            self.errors.append(error_msg)
+        
         if len(p) > 4:
             p[0] = CallExpr(Identifier(p[1]), p[3])
         else:
@@ -322,63 +323,74 @@ class PLYParser:
         else:
             p[0] = p[1] + [p[3]]
     
+    def p_type_annotation(self, p):
+        '''type_annotation : ARROW ID
+                          | empty'''
+        if len(p) > 2:
+            p[0] = Type(p[2])
+        else:
+            p[0] = None
+    
+    def p_empty(self, p):
+        '''empty :'''
+        pass
+    
     def p_error(self, p):
-        # Si el código es válido, no reportar errores sintácticos
-        if self.valid_code:
-            # Intentar recuperarse del error
-            self.parser.errok()
+        if p is None:
+            error_msg = "Error sintáctico: Final inesperado del archivo"
+            self.errors.append(error_msg)
             return
         
-        if p:
-            line_number = p.lineno
-            
-            # Determinar el tipo de error
-            if p.type == 'ID' and p.value == 'pritn':
-                message = f"Error de sintaxis: identificador desconocido '{p.value}'"
-                suggestion = f"¿Querías decir 'print'?"
-            else:
-                message = f"Error de sintaxis en token '{p.value}' (tipo: {p.type})"
-                suggestion = self._get_suggestion_for_error(p, line_number)
-            
-            self.add_error(line_number, message, suggestion)
-            
-            # Intentar recuperarse del error
-            self.parser.errok()
+        # Obtener la línea completa donde está el error
+        line = self.source_lines[p.lineno - 1]
+        
+        # Si la línea es un comentario, ignorarla
+        if line.strip().startswith('#'):
+            return
+        
+        column = p.lexpos - sum(len(l) + 1 for l in self.source_lines[:p.lineno - 1])
+
+        # Detectar errores específicos de sintaxis
+        if p.type == 'RPAREN' and ',' in line and line.strip().endswith(')'):
+            # Detectar argumentos faltantes
+            error_msg = f"""Error sintáctico en línea {p.lineno}: Falta un argumento después de la coma
+En el código:
+    {line}
+    {' ' * (line.rfind(',') + 1)}^ Falta un argumento aquí
+Ejemplo correcto: {line.replace(', )', ', 10)')}"""
+        elif p.type == 'STRING' or (p.type in ['LPAREN', 'RPAREN'] and '"' in line or "'" in line):
+            # Verificar comillas no balanceadas
+            quote_char = '"' if '"' in line else "'"
+            if line.count(quote_char) % 2 != 0:
+                # Construir el ejemplo correcto
+                start_quote_pos = line.find(quote_char)
+                unclosed_text = line[start_quote_pos + 1:]
+                correct_example = f"{line[:start_quote_pos]}{quote_char}{unclosed_text}{quote_char})"
+                
+                error_msg = f"""Error sintáctico en línea {p.lineno}: Cadena de texto no cerrada correctamente
+En el código:
+    {line}
+    {' ' * start_quote_pos}^ La cadena comienza aquí pero no se cierra correctamente
+Sugerencia: Asegúrate de cerrar la cadena con {quote_char}
+Ejemplo correcto: {correct_example}"""
+        elif 'def' in line and ':' not in line:
+            error_msg = f"""Error sintáctico en línea {p.lineno}: Falta el ':' después de la definición de función
+En el código:
+    {line}
+    {' ' * len(line)}^ Falta el ':' aquí
+Ejemplo correcto: {line}:"""
         else:
-            # No añadir el error "Error de sintaxis al final del archivo" si el código es válido
-            if not self.valid_code:
-                self.add_error(len(self.source_lines), "Error de sintaxis al final del archivo")
-    
-    def _get_suggestion_for_error(self, token, line_number):
-        """Genera una sugerencia basada en el tipo de error"""
-        if token.type == 'ID':
-            # Verificar si es un posible error tipográfico
-            for func in self.known_functions + list(self.user_defined_functions):
-                if self._is_similar(token.value, func) and token.value != func:
-                    return f"¿Querías decir '{func}' en lugar de '{token.value}'?"
+            # Mensaje genérico para otros errores sintácticos
+            error_msg = f"""Error sintáctico en línea {p.lineno}: Token inesperado '{p.value}'
+En el código:
+    {line}
+    {' ' * column}^ Aquí"""
+
+        self.errors.append(error_msg)
         
-        # Verificar si hay un problema con f-strings
-        if token.type == 'STRING' and 'pritn' in self.source_lines[line_number - 1]:
-            return "Hay un error en el nombre de la función. ¿Querías usar 'print'?"
-        
-        # Verificar si hay un problema con la sintaxis de la función
-        if token.type == 'KEYWORD' and token.value in ('def', 'return', 'if', 'else'):
-            return f"Verifica la sintaxis de la declaración '{token.value}'"
-        
-        return None
-    
-    def _is_similar(self, str1, str2):
-        """Comprueba si dos cadenas son similares (para detectar errores tipográficos)"""
-        # Si las longitudes son muy diferentes, no son similares
-        if abs(len(str1) - len(str2)) > 2:
-            return False
-        
-        # Si una es prefijo de la otra, son similares
-        if str1.startswith(str2) or str2.startswith(str1):
-            return True
-        
-        # Contar cuántos caracteres diferentes hay
-        diff_count = sum(1 for a, b in zip(str1, str2) if a != b)
-        
-        # Si hay pocos caracteres diferentes, son similares
-        return diff_count <= 2
+        # Intentar recuperarse del error
+        while True:
+            tok = self.parser.token()
+            if not tok or tok.type == 'NEWLINE':
+                break
+        self.parser.errok()

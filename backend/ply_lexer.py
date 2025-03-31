@@ -34,7 +34,7 @@ class Token:
     position: Position
 
 # Funciones conocidas para sugerencias
-known_functions = ['print', 'len', 'range', 'int', 'str', 'float', 'list', 'dict', 'set', 'tuple']
+known_functions = ['print', 'len', 'range', 'int', 'str', 'float', 'list', 'dict', 'set', 'tuple', 'input']
 
 # Definición de tokens para PLY - solo los que realmente usamos
 tokens = (
@@ -42,9 +42,9 @@ tokens = (
     'PLUS', 'MINUS', 'TIMES', 'DIVIDE', 'MOD',
     'EQ', 'NE', 'LT', 'GT', 'LE', 'GE',
     'LPAREN', 'RPAREN', 
-    'COMMA', 'COLON', 'ARROW',
+    'COMMA', 'COLON',
     'ASSIGN', 'NEWLINE', 'INDENT', 'DEDENT',
-    'KEYWORD'
+    'KEYWORD', 'ARROW'
 )
 
 class PLYLexer:
@@ -77,7 +77,6 @@ class PLYLexer:
     t_COMMA = r','
     t_COLON = r':'
     t_ASSIGN = r'='
-    t_ARROW = r'->'
     
     # Ignorar espacios y tabs (excepto para indentación)
     t_ignore = ' \t'
@@ -88,6 +87,7 @@ class PLYLexer:
         self.lexer.input(text)
         self.errors = []
         self.source_lines = text.splitlines()
+        self.valid_code = True  # Añadir esta bandera
         
         # Variables para manejar indentación
         self.indent_stack = [0]
@@ -95,6 +95,31 @@ class PLYLexer:
     
     def t_ID(self, t):
         r'[a-zA-Z_][a-zA-Z0-9_]*'
+        if not all(ord(c) < 128 for c in t.value):
+            self.errors.append(f"Error en línea {t.lexer.lineno}: El identificador '{t.value}' contiene caracteres no ASCII.")
+            self.valid_code = False
+            return None
+        
+        # Verificar errores comunes de escritura
+        common_typos = {
+            'pritn': 'print',
+            'pint': 'print',
+            'pirnt': 'print',
+            'lenght': 'length',
+            'retrun': 'return',
+            'inut': 'input',
+            'inpt': 'input',
+            'imput': 'input'
+        }
+        
+        if t.value in common_typos:
+            self.errors.append(f"""Error léxico en línea {t.lexer.lineno}: '{t.value}' no es una función válida
+En el código:
+    {self.source_lines[t.lexer.lineno - 1]}
+    {' ' * self.source_lines[t.lexer.lineno - 1].find(t.value)}^ ¿Quisiste decir '{common_typos[t.value]}'?""")
+            self.valid_code = False
+            return None
+        
         if t.value in self.keywords:
             t.type = 'KEYWORD'
         return t
@@ -108,9 +133,11 @@ class PLYLexer:
         return t
     
     def t_STRING(self, t):
-        r'(\"[^\"]*\"|\'[^\']*\'|f\"[^\"]*\"|f\'[^\']*\')'
-        # Eliminar comillas
-        t.value = t.value[1:-1]
+        r'\"[^\"]*\"?|\'[^\']*\'?'  # Modificamos la regex para aceptar cadenas incompletas
+        # La cadena puede o no terminar con comilla (?)
+        t.value = t.value[1:]  # Quitamos solo la comilla inicial
+        if t.value.endswith('"') or t.value.endswith("'"):
+            t.value = t.value[:-1]  # Quitamos la comilla final solo si existe
         return t
     
     def t_NEWLINE(self, t):
@@ -146,11 +173,21 @@ class PLYLexer:
     
     def t_COMMENT(self, t):
         r'\#.*'
-        pass  # Ignorar comentarios
+        # Simplemente ignorar el comentario sin hacer ninguna validación
+        return None
     
     def t_error(self, t):
-        error_msg = f"Error en línea {t.lexer.lineno}: Carácter ilegal '{t.value[0]}'"
+        # Obtener la línea completa donde está el error
+        line = self.source_lines[t.lexer.lineno - 1]
+        column = t.lexpos - sum(len(l) + 1 for l in self.source_lines[:t.lexer.lineno - 1])
+        
+        error_msg = f"""Error léxico en línea {t.lexer.lineno}: Carácter no válido '{t.value[0]}'
+En el código:
+    {line}
+    {' ' * column}^ Aquí se encontró el carácter no válido"""
+        
         self.errors.append(error_msg)
+        self.valid_code = False
         t.lexer.skip(1)
     
     def token(self):
@@ -165,11 +202,17 @@ class PLYLexer:
             tok.lexpos = 0
             return tok
         
-        # Si no hay tokens en la cola, obtener el siguiente token del lexer
+        # Si no hay más tokens en el input, emitir DEDENT pendientes
         tok = self.lexer.token()
-        
-        # Verificar errores tipográficos comunes
-        if tok and tok.type == 'ID' and tok.value == 'pritn':
-            self.errors.append(f"Error en línea {tok.lineno}: Posible error tipográfico: 'pritn'. ¿Querías decir 'print'?")
+        if not tok and self.indent_stack[-1] > 0:
+            # Emitir DEDENT para cada nivel de indentación pendiente
+            while len(self.indent_stack) > 1:
+                self.indent_stack.pop()
+                self.tokens_queue.append(('DEDENT', 'DEDENT', self.lexer.lineno))
+            return self.token()  # Llamada recursiva para obtener el DEDENT de la cola
         
         return tok
+
+    def t_ARROW(self, t):
+        r'->'
+        return t
