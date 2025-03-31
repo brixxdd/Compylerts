@@ -55,6 +55,7 @@ class GroupingExpr(Expr):
 @dataclass
 class Literal(Expr):
     value: Any
+    type_name: str  # 'number', 'string', 'boolean', etc.
 
 @dataclass
 class Identifier(Expr):
@@ -200,10 +201,6 @@ class UnaryExpr(Expression):
 class GroupingExpr(Expression):
     def __init__(self, expression):
         self.expression = expression
-
-class Literal(Expression):
-    def __init__(self, value):
-        self.value = value
 
 class Identifier(Expression):
     def __init__(self, name):

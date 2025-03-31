@@ -20,52 +20,52 @@ def main():
     except EOFError:
         pass
     
-    # Crear instancia del lexer y parser
-    lexer = PLYLexer(source_code)
-    parser = PLYParser()
-    
-    # Realizar el análisis léxico
-    print("\nTokens encontrados:")
-    print("-" * 40)
-    tokens_found = []
-    while True:
-        tok = lexer.token()
-        if not tok:
-            break
-        tokens_found.append(f"{tok.type}: {tok.value}")
-    
-    # Mostrar tokens encontrados
-    for token in tokens_found:
-        print(token)
-    
-    # Verificar errores léxicos
-    if lexer.errors:
-        print("\n❌ Errores léxicos:")
-        for error in lexer.errors:
-            print(f"{Fore.RED}{error}{Style.RESET_ALL}")
-        return
-    
-    # Realizar análisis sintáctico
-    result = parser.parse(source_code)
-    
-    # Mostrar errores léxicos primero si existen
-    if lexer.errors:
-        print("\n❌ Errores léxicos:")
-        for error in lexer.errors:
-            print(f"{Fore.RED}{error}{Style.RESET_ALL}")
-        return
-    
-    # Mostrar errores sintácticos si existen
-    if parser.errors:
-        print("\n❌ Errores sintácticos:")
-        for error in parser.errors:
-            print(f"{Fore.RED}{error}{Style.RESET_ALL}")
-        return
-    
-    print("\n✅ No se encontraron errores léxicos")
-    print("✅ Análisis sintáctico completado sin errores")
-    
-    print("\n¡Análisis completado!")
+    try:
+        # Crear instancia del lexer y parser
+        lexer = PLYLexer(source_code)
+        parser = PLYParser()
+        
+        # Realizar el análisis léxico
+        print("\nTokens encontrados:")
+        print("-" * 40)
+        tokens_found = []
+        while True:
+            tok = lexer.token()
+            if not tok:
+                break
+            tokens_found.append(f"{tok.type}: {tok.value}")
+        
+        # Mostrar tokens encontrados
+        for token in tokens_found:
+            print(token)
+        
+        # Verificar errores léxicos
+        if lexer.errors:
+            print("\n❌ Errores léxicos:")
+            for error in lexer.errors:
+                print(f"{Fore.RED}{error}{Style.RESET_ALL}")
+            return
+        
+        # Realizar análisis sintáctico y semántico
+        result = parser.parse(source_code)
+        
+        # Mostrar errores sintácticos y semánticos
+        if parser.errors:
+            print("\n❌ Errores encontrados:")
+            for error in parser.errors:
+                print(f"{Fore.RED}{error}{Style.RESET_ALL}")
+        elif parser.semantic_errors:
+            print("\n❌ Errores semánticos:")
+            for error in parser.semantic_errors:
+                print(f"{Fore.YELLOW}{error}{Style.RESET_ALL}")
+        else:
+            print("\n✅ No se encontraron errores")
+            print("✅ Análisis completado sin errores")
+            
+    except Exception as e:
+        print(f"\n❌ Error inesperado: {str(e)}")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     main()

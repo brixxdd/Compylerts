@@ -87,7 +87,8 @@ class PLYLexer:
         self.lexer.input(text)
         self.errors = []
         self.source_lines = text.splitlines()
-        self.valid_code = True  # Añadir esta bandera
+        self.valid_code = True
+        self.lineno = 1  # Añadir contador de línea
         
         # Variables para manejar indentación
         self.indent_stack = [0]
@@ -143,6 +144,7 @@ En el código:
     def t_NEWLINE(self, t):
         r'\n+'
         t.lexer.lineno += len(t.value)
+        self.lineno = t.lexer.lineno  # Actualizar nuestro contador de línea
         
         # Calcular indentación
         if t.lexer.lexpos < len(t.lexer.lexdata):
@@ -158,16 +160,16 @@ En el código:
                 if indent > self.indent_stack[-1]:
                     # Aumentar indentación
                     self.indent_stack.append(indent)
-                    self.tokens_queue.append(('INDENT', 'INDENT', t.lexer.lineno))
+                    self.tokens_queue.append(('INDENT', 'INDENT', self.lineno))
                 elif indent < self.indent_stack[-1]:
                     # Disminuir indentación
                     while indent < self.indent_stack[-1]:
                         self.indent_stack.pop()
-                        self.tokens_queue.append(('DEDENT', 'DEDENT', t.lexer.lineno))
+                        self.tokens_queue.append(('DEDENT', 'DEDENT', self.lineno))
                     
                     # Verificar que la indentación coincida con un nivel anterior
                     if indent != self.indent_stack[-1]:
-                        self.errors.append(f"Error en línea {t.lexer.lineno}: Indentación inconsistente")
+                        self.errors.append(f"Error en línea {self.lineno}: Indentación inconsistente")
         
         return t
     
@@ -208,8 +210,11 @@ En el código:
             # Emitir DEDENT para cada nivel de indentación pendiente
             while len(self.indent_stack) > 1:
                 self.indent_stack.pop()
-                self.tokens_queue.append(('DEDENT', 'DEDENT', self.lexer.lineno))
+                self.tokens_queue.append(('DEDENT', 'DEDENT', self.lineno))
             return self.token()  # Llamada recursiva para obtener el DEDENT de la cola
+        
+        if tok:
+            tok.lineno = self.lineno  # Asignar el número de línea actual
         
         return tok
 

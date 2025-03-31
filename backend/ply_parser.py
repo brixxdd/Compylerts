@@ -6,6 +6,7 @@ from ast_nodes import (
     Parameter, Type, BinaryOp, UnaryOp
 )
 import re
+from symbol_table import SymbolTable, Symbol, Scope
 
 class PLYParser:
     """Parser sintáctico basado en PLY para el compilador Python -> TypeScript"""
@@ -30,33 +31,35 @@ class PLYParser:
         self.known_functions = known_functions
         self.lexer = None
         self.valid_code = True  # Asumimos que el código es válido hasta que se demuestre lo contrario
+        self.symbol_table = SymbolTable()
+        self.semantic_errors = []
     
     def parse(self, text):
         """Analiza el texto y construye el AST"""
-        # Guardar las líneas del código fuente para mostrar errores
         self.source_lines = text.splitlines()
         self.errors = []
-        self.user_defined_functions = set()
-        self.valid_code = True
-        
-        # Extraer nombres de funciones definidas por el usuario
-        self._extract_user_functions(text)
+        self.semantic_errors = []
+        self.symbol_table = SymbolTable()  # Reiniciar tabla de símbolos
         
         try:
             self.lexer = PLYLexer(text)
             
-            # Si hay errores léxicos, detener el proceso
+            # Verificar errores léxicos
             if self.lexer.errors:
-                for error in self.lexer.errors:
-                    self.errors.append(error)
+                self.errors.extend(self.lexer.errors)
                 return None
             
-            # Realizar el análisis sintáctico
-            result = self.parser.parse(lexer=self.lexer, debug=False)
-            return result
+            # Realizar análisis sintáctico
+            ast = self.parser.parse(lexer=self.lexer)
+            
+            # Verificar errores semánticos
+            if self.semantic_errors:
+                self.errors.extend(self.semantic_errors)
+                return None
+            
+            return ast
         except Exception as e:
-            # Eliminar este bloque de manejo de excepción genérica
-            # ya que los errores sintácticos ya son manejados por p_error
+            self.errors.append(f"Error inesperado: {str(e)}")
             return None
     
     def _extract_user_functions(self, text):
@@ -103,7 +106,48 @@ class PLYParser:
     
     def p_program(self, p):
         '''program : statement_list'''
+        # Primero procesar todas las definiciones de funciones
+        self.symbol_table = SymbolTable()  # Reiniciar tabla de símbolos
+        
+        # Primera pasada: registrar todas las funciones
+        if p[1]:
+            for stmt in p[1]:
+                if isinstance(stmt, FunctionDef):
+                    func_symbol = Symbol(
+                        name=stmt.name,
+                        type='function',
+                        kind='function',
+                        parameters=stmt.params,
+                        return_type=stmt.return_type
+                    )
+                    self.symbol_table.define(func_symbol)
+        
+        # Segunda pasada: verificar el resto de las referencias
+        if p[1]:
+            for stmt in p[1]:
+                if isinstance(stmt, CallExpr):
+                    self._check_function_call(stmt, p.lineno)
+                elif isinstance(stmt, Identifier):
+                    self._check_variable_reference(stmt, p.lineno)
+        
         p[0] = Program(p[1] if p[1] else [])
+    
+    def _check_function_call(self, call_expr, line):
+        """Verifica una llamada a función"""
+        func_name = call_expr.callee.name
+        if not self.symbol_table.resolve(func_name) and func_name not in ['print', 'input', 'len']:
+            self.semantic_errors.append(
+                f"Error semántico en línea {line}: "
+                f"Función '{func_name}' no está definida"
+            )
+    
+    def _check_variable_reference(self, identifier, line):
+        """Verifica una referencia a variable"""
+        if not self.symbol_table.resolve(identifier.name):
+            self.semantic_errors.append(
+                f"Error semántico en línea {line}: "
+                f"Variable '{identifier.name}' no está definida"
+            )
     
     def p_statement_list(self, p):
         '''statement_list : statement
@@ -135,11 +179,38 @@ class PLYParser:
     
     def p_expression_statement(self, p):
         '''expression_statement : expression NEWLINE'''
-        p[0] = ExpressionStmt(p[1])
+        expr = p[1]
+        
+        # Verificar referencias a variables
+        if isinstance(expr, CallExpr):
+            # Verificar los argumentos de la llamada a función
+            for arg in expr.arguments:
+                if isinstance(arg, Identifier):
+                    symbol = self.symbol_table.resolve(arg.name)
+                    if not symbol and arg.name not in ['True', 'False', 'None']:
+                        self.semantic_errors.append(
+                            f"Error semántico en línea {p.lexer.lineno}: "  # Usar p.lexer.lineno
+                            f"Variable '{arg.name}' no está definida"
+                        )
+        
+        p[0] = ExpressionStmt(expr)
     
     def p_assignment_statement(self, p):
         '''assignment_statement : ID ASSIGN expression NEWLINE'''
-        p[0] = AssignmentStmt(Identifier(p[1]), p[3])
+        name = p[1]
+        value = p[3]
+        
+        # Si estamos en el ámbito global, crear una variable global
+        if self.symbol_table.current_scope == self.symbol_table.global_scope:
+            symbol = Symbol(name=name, type='any', kind='variable')
+            self.symbol_table.define(symbol)
+        else:
+            # Verificar si la variable existe en algún ámbito
+            if not self.symbol_table.resolve(name):
+                symbol = Symbol(name=name, type='any', kind='variable')
+                self.symbol_table.define(symbol)
+        
+        p[0] = AssignmentStmt(Identifier(name), value)
     
     def p_return_statement(self, p):
         '''return_statement : KEYWORD expression NEWLINE
@@ -156,13 +227,47 @@ class PLYParser:
         p[0] = p[1]
     
     def p_function_def(self, p):
-        '''function_def : KEYWORD ID LPAREN parameter_list RPAREN type_annotation COLON NEWLINE INDENT statement_list DEDENT
-                       | KEYWORD ID LPAREN RPAREN type_annotation COLON NEWLINE INDENT statement_list DEDENT'''
+        '''function_def : KEYWORD ID LPAREN parameter_list RPAREN type_annotation COLON NEWLINE INDENT statement_list DEDENT'''
         if p[1] == 'def':
             name = p[2]
             params = [] if p[4] == ')' else p[4]
-            return_type = p[5]
-            body = p[10] if len(p) > 10 else p[9]
+            return_type = p[6].name if p[6] else 'None'
+            
+            # Crear nuevo ámbito para la función
+            self.symbol_table.enter_scope("function")
+            
+            # Registrar los parámetros en el ámbito de la función
+            for param in params:
+                param_symbol = Symbol(
+                    name=param.name,
+                    type=param.type.name if param.type else 'any',
+                    kind='parameter'
+                )
+                self.symbol_table.define(param_symbol)
+            
+            # Procesar el cuerpo de la función
+                body = p[10]
+            
+            # Crear y registrar el símbolo de la función en el ámbito global
+            func_symbol = Symbol(
+                name=name,
+                type='function',
+                kind='function',
+                parameters=params,
+                return_type=return_type
+            )
+            
+            # Salir del ámbito de la función
+            self.symbol_table.exit_scope()
+            
+            # Registrar la función en el ámbito global
+            if not self.symbol_table.define(func_symbol):
+                self.semantic_errors.append(
+                    f"Error semántico en línea {p.lineno()}: "
+                    f"La función '{name}' ya está definida"
+                )
+                return
+            
             p[0] = FunctionDef(name, params, return_type, body)
     
     def p_parameter_list(self, p):
@@ -270,16 +375,15 @@ class PLYParser:
         '''literal : NUMBER
                   | STRING'''
         # Determinar el tipo de literal
-        if isinstance(p[1], int) or isinstance(p[1], float):
-            p[0] = Literal(p[1], 'number')
-        elif p[1] == 'True':
-            p[0] = Literal(True, 'boolean')
-        elif p[1] == 'False':
-            p[0] = Literal(False, 'boolean')
+        if isinstance(p[1], (int, float)):
+            p[0] = Literal(value=p[1], type_name='number')
+        elif isinstance(p[1], str):
+            if p[1] in ['True', 'False']:
+                p[0] = Literal(value=p[1] == 'True', type_name='boolean')
         elif p[1] == 'None':
-            p[0] = Literal(None, 'null')
-        else:  # String
-            p[0] = Literal(p[1], 'string')
+                p[0] = Literal(value=None, type_name='null')
+        else:  # String normal
+                p[0] = Literal(value=p[1], type_name='string')
     
     def p_group(self, p):
         '''group : LPAREN expression RPAREN'''
@@ -289,36 +393,37 @@ class PLYParser:
         '''call : ID LPAREN arguments RPAREN
                 | ID LPAREN RPAREN'''
         func_name = p[1]
+        args = [] if len(p) == 4 else p[3]
         
-        # Verificar si la función existe
-        if func_name not in self.known_functions and func_name not in self.user_defined_functions:
-            # Buscar funciones similares para sugerir correcciones
-            similar_functions = []
-            for func in self.known_functions:
-                # Mejorar la detección de similitud
-                if abs(len(func) - len(func_name)) <= 2:  # Permitir hasta 2 caracteres de diferencia
-                    # Verificar si las funciones son similares
-                    common_chars = sum(1 for a, b in zip(func_name, func) if a == b)
-                    if common_chars >= len(func_name) - 2:
-                        similar_functions.append(func)
-            
-            suggestion = f"¿Quisiste decir '{similar_functions[0]}'?" if similar_functions else "Verifica el nombre de la función"
-            error_msg = f"""Error sintáctico en línea {p.lineno}: Función '{func_name}' no definida
-En el código:
-    {self.source_lines[p.lineno - 1]}
-    {' ' * self.source_lines[p.lineno - 1].find(func_name)}^ Aquí
-Sugerencia: {suggestion}"""
-            self.errors.append(error_msg)
+        # Verificar si la función existe y el número de argumentos
+        symbol = self.symbol_table.resolve(func_name)
+        if not symbol:
+            if func_name not in ['print', 'input', 'len']:  # Funciones built-in
+                self.semantic_errors.append(
+                    f"Error semántico en línea {p.lexer.lineno}: "  # Usar p.lexer.lineno
+                    f"Función '{func_name}' no está definida"
+                )
+            p[0] = CallExpr(Identifier(func_name), args)
+            return
         
-        # Verificar argumentos
-        if len(p) > 4 and p[3] is None:
-            # Error en los argumentos, ya reportado
-            p[0] = None
-        else:
-            if len(p) > 4:
-                p[0] = CallExpr(Identifier(p[1]), p[3])
-            else:
-                p[0] = CallExpr(Identifier(p[1]), [])
+        if symbol.kind != 'function':
+            self.semantic_errors.append(
+                f"Error semántico en línea {p.lexer.lineno}: "  # Usar p.lexer.lineno
+                f"'{func_name}' no es una función"
+            )
+            p[0] = CallExpr(Identifier(func_name), args)
+            return
+        
+        expected_args = len(symbol.parameters) if symbol.parameters else 0
+        received_args = len(args)
+        if expected_args != received_args:
+            self.semantic_errors.append(
+                f"Error semántico en línea {p.lexer.lineno}: "  # Usar p.lexer.lineno
+                f"La función '{func_name}' espera {expected_args} argumentos "
+                f"pero recibió {received_args}"
+            )
+        
+        p[0] = CallExpr(Identifier(func_name), args)
     
     def p_arguments(self, p):
         '''arguments : expression
@@ -333,7 +438,7 @@ Sugerencia: {suggestion}"""
             error_msg = f"""Error sintáctico en línea {p.lineno}: Argumento faltante después de la coma
 En el código:
     {self.source_lines[p.lineno - 1]}
-    {' ' * (self.source_lines[p.lineno - 1].rfind(','))}^ No se permite una coma al final sin un argumento
+    {' ' * (self.source_lines[p.lineno - 1].rfind(',') + 1)}^ No se permite una coma al final sin un argumento
 Sugerencia: Elimina la coma o agrega el argumento faltante
 Ejemplo correcto: {func_name}(5) o {func_name}(5, 10)"""
             self.errors.append(error_msg)
