@@ -21,6 +21,7 @@ class TokenType(Enum):
     ARROW = auto()
     ASYNC = auto()
     AWAIT = auto()
+    TRAILING_COMMA = auto()
 
 @dataclass
 class Position:
@@ -44,7 +45,7 @@ tokens = (
     'LPAREN', 'RPAREN', 
     'COMMA', 'COLON',
     'ASSIGN', 'NEWLINE', 'INDENT', 'DEDENT',
-    'KEYWORD', 'ARROW'
+    'KEYWORD', 'ARROW', 'TRAILING_COMMA'
 )
 
 class PLYLexer:
@@ -74,7 +75,6 @@ class PLYLexer:
     t_GE = r'>='
     t_LPAREN = r'\('
     t_RPAREN = r'\)'
-    t_COMMA = r','
     t_COLON = r':'
     t_ASSIGN = r'='
     
@@ -216,3 +216,60 @@ En el código:
     def t_ARROW(self, t):
         r'->'
         return t
+
+    def t_COMMA(self, t):
+        r','
+        # Verificar si hay un paréntesis de cierre después de la coma
+        pos = t.lexpos + 1
+        while pos < len(t.lexer.lexdata) and t.lexer.lexdata[pos] in ' \t':
+            pos += 1
+        
+        if pos < len(t.lexer.lexdata) and t.lexer.lexdata[pos] == ')':
+            # Es una coma seguida de paréntesis
+            line = self.source_lines[t.lexer.lineno - 1]
+            # Encontrar el nombre de la función
+            func_name = line[:line.find('(')].strip()
+            if '=' in func_name:
+                func_name = func_name.split('=')[1].strip()
+            
+            # Calcular la posición exacta de la coma
+            column = line.find(',')
+            
+            error_msg = f"""Error léxico en línea {t.lexer.lineno}: Argumento faltante después de la coma
+En el código:
+    {line}
+    {' ' * column}^ No se permite una coma al final sin un argumento
+Sugerencia: La función '{func_name}' espera otro argumento después de la coma
+Ejemplo correcto: {func_name}(5, 10)"""
+            self.errors.append(error_msg)
+            self.valid_code = False
+        return t
+
+    def parse(self, text):
+        """Analiza el texto y construye el AST"""
+        self.source_lines = text.splitlines()
+        self.errors = []
+        self.valid_code = True
+        
+        try:
+            self.lexer = PLYLexer(text)
+            
+            # Realizar el análisis léxico primero
+            tokens = []
+            while True:
+                tok = self.lexer.token()
+                if not tok:
+                    break
+                if tok.type == 'TRAILING_COMMA':
+                    # Detener el análisis si encontramos una coma huérfana
+                    return None
+                tokens.append(tok)
+            
+            if not self.valid_code:
+                return None
+            
+            # Continuar con el análisis sintáctico si no hay errores
+            return self.parser.parse(tokens)
+        except Exception as e:
+            self.errors.append(f"Error inesperado: {str(e)}")
+            return None

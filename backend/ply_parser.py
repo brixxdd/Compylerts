@@ -310,16 +310,34 @@ En el código:
 Sugerencia: {suggestion}"""
             self.errors.append(error_msg)
         
-        if len(p) > 4:
-            p[0] = CallExpr(Identifier(p[1]), p[3])
+        # Verificar argumentos
+        if len(p) > 4 and p[3] is None:
+            # Error en los argumentos, ya reportado
+            p[0] = None
         else:
-            p[0] = CallExpr(Identifier(p[1]), [])
+            if len(p) > 4:
+                p[0] = CallExpr(Identifier(p[1]), p[3])
+            else:
+                p[0] = CallExpr(Identifier(p[1]), [])
     
     def p_arguments(self, p):
         '''arguments : expression
-                     | arguments COMMA expression'''
+                     | arguments COMMA expression
+                     | error COMMA
+                     | arguments COMMA error'''
         if len(p) == 2:
             p[0] = [p[1]]
+        elif len(p) == 4 and p[2] == ',' and p[3] == 'error':
+            # Error: coma al final sin argumento
+            func_name = self.source_lines[p.lineno - 1][:self.source_lines[p.lineno - 1].find('(')].strip()
+            error_msg = f"""Error sintáctico en línea {p.lineno}: Argumento faltante después de la coma
+En el código:
+    {self.source_lines[p.lineno - 1]}
+    {' ' * (self.source_lines[p.lineno - 1].rfind(','))}^ No se permite una coma al final sin un argumento
+Sugerencia: Elimina la coma o agrega el argumento faltante
+Ejemplo correcto: {func_name}(5) o {func_name}(5, 10)"""
+            self.errors.append(error_msg)
+            p[0] = None
         else:
             p[0] = p[1] + [p[3]]
     
@@ -352,12 +370,14 @@ Sugerencia: {suggestion}"""
 
         # Detectar errores específicos de sintaxis
         if p.type == 'RPAREN' and ',' in line and line.strip().endswith(')'):
-            # Detectar argumentos faltantes
-            error_msg = f"""Error sintáctico en línea {p.lineno}: Falta un argumento después de la coma
+            # Detectar argumentos faltantes en llamadas a funciones
+            func_name = line[:line.find('(')].strip()
+            error_msg = f"""Error sintáctico en línea {p.lineno}: Argumento faltante en la llamada a la función '{func_name}'
 En el código:
     {line}
-    {' ' * (line.rfind(',') + 1)}^ Falta un argumento aquí
-Ejemplo correcto: {line.replace(', )', ', 10)')}"""
+    {' ' * (line.rfind(',') + 1)}^ Falta un argumento después de la coma
+Ejemplo correcto: {line.replace(',)', ', 10)')}
+Sugerencia: Las llamadas a funciones deben tener todos sus argumentos especificados"""
         elif p.type == 'STRING' or (p.type in ['LPAREN', 'RPAREN'] and '"' in line or "'" in line):
             # Verificar comillas no balanceadas
             quote_char = '"' if '"' in line else "'"

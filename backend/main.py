@@ -52,7 +52,7 @@ def main():
     if lexer.errors:
         print("\n❌ Errores léxicos:")
         for error in lexer.errors:
-            print(error)
+            print(f"{Fore.RED}{error}{Style.RESET_ALL}")
         return
     
     # Mostrar errores sintácticos si existen
@@ -60,9 +60,10 @@ def main():
         print("\n❌ Errores sintácticos:")
         for error in parser.errors:
             print(f"{Fore.RED}{error}{Style.RESET_ALL}")
-    else:
-        print("\n✅ No se encontraron errores léxicos")
-        print("✅ Análisis sintáctico completado sin errores")
+        return
+    
+    print("\n✅ No se encontraron errores léxicos")
+    print("✅ Análisis sintáctico completado sin errores")
     
     print("\n¡Análisis completado!")
 

@@ -104,6 +104,28 @@ class DelimiterError(ErrorStmt):
     expected: str
     found: Optional[str]
 
+@dataclass
+class ArgumentError(ErrorStmt):
+    """Error específico de argumentos en llamadas a funciones"""
+    function_name: str
+    expected_args: int
+    found_args: int
+
+@dataclass
+class TrailingCommaError(ErrorStmt):
+    """Error específico para comas huérfanas en llamadas a funciones"""
+    function_name: str
+    line: int
+    column: int
+    example: str
+
+    def __str__(self):
+        return f"""Error en línea {self.line}: Coma huérfana en llamada a función '{self.function_name}'
+En el código:
+    {self.example}
+    {' ' * self.column}^ No se permiten comas sin argumentos
+Sugerencia: Agrega un argumento después de la coma o elimina la coma"""
+
 # Enumeraciones para operadores
 class BinaryOp(Enum):
     PLUS = auto()
