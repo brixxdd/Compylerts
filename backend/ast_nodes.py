@@ -101,4 +101,102 @@ class IndentationError(ErrorStmt):
 class DelimiterError(ErrorStmt):
     """Error de delimitadores (paréntesis, dos puntos, etc)"""
     expected: str
-    found: Optional[str] 
+    found: Optional[str]
+
+# Enumeraciones para operadores
+class BinaryOp:
+    ADD = '+'
+    SUBTRACT = '-'
+    MULTIPLY = '*'
+    DIVIDE = '/'
+    MODULO = '%'
+    EQUAL = '=='
+    NOT_EQUAL = '!='
+    LESS_THAN = '<'
+    GREATER_THAN = '>'
+    LESS_EQUAL = '<='
+    GREATER_EQUAL = '>='
+
+class UnaryOp:
+    NEGATE = '-'
+
+# Nodo base
+class ASTNode:
+    pass
+
+# Nodo raíz del programa
+class Program(ASTNode):
+    def __init__(self, statements):
+        self.statements = statements
+
+# Declaraciones
+class Statement(ASTNode):
+    pass
+
+class ExpressionStmt(Statement):
+    def __init__(self, expression):
+        self.expression = expression
+
+class AssignmentStmt(Statement):
+    def __init__(self, target, value):
+        self.target = target
+        self.value = value
+
+class ReturnStmt(Statement):
+    def __init__(self, value):
+        self.value = value
+
+class FunctionDef(Statement):
+    def __init__(self, name, params, return_type, body):
+        self.name = name
+        self.params = params
+        self.return_type = return_type
+        self.body = body
+
+class IfStmt(Statement):
+    def __init__(self, condition, then_branch, else_branch):
+        self.condition = condition
+        self.then_branch = then_branch
+        self.else_branch = else_branch
+
+# Expresiones
+class Expression(ASTNode):
+    pass
+
+class BinaryExpr(Expression):
+    def __init__(self, left, operator, right):
+        self.left = left
+        self.operator = operator
+        self.right = right
+
+class UnaryExpr(Expression):
+    def __init__(self, operator, operand):
+        self.operator = operator
+        self.operand = operand
+
+class GroupingExpr(Expression):
+    def __init__(self, expression):
+        self.expression = expression
+
+class Literal(Expression):
+    def __init__(self, value):
+        self.value = value
+
+class Identifier(Expression):
+    def __init__(self, name):
+        self.name = name
+
+class CallExpr(Expression):
+    def __init__(self, callee, arguments):
+        self.callee = callee
+        self.arguments = arguments
+
+# Parámetros y tipos
+class Parameter(ASTNode):
+    def __init__(self, name, type):
+        self.name = name
+        self.type = type
+
+class Type(ASTNode):
+    def __init__(self, name):
+        self.name = name 

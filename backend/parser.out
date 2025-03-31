@@ -1,0 +1,3153 @@
+Created by PLY version 3.11 (http://www.dabeaz.com/ply)
+
+Unused terminals:
+
+    AND
+    CLASS
+    DOT
+    FOR
+    IN
+    LBRACE
+    LBRACKET
+    OR
+    PRINT
+    RBRACE
+    RBRACKET
+    SEMICOLON
+    WHILE
+
+Grammar
+
+Rule 0     S' -> program
+Rule 1     program -> declaration_list
+Rule 2     declaration_list -> declaration
+Rule 3     declaration_list -> declaration_list declaration
+Rule 4     declaration -> var_declaration
+Rule 5     declaration -> fun_declaration
+Rule 6     declaration -> if_statement
+Rule 7     declaration -> return_statement
+Rule 8     declaration -> expression_statement
+Rule 9     declaration -> NEWLINE
+Rule 10    var_declaration -> ID ASSIGN expression
+Rule 11    fun_declaration -> DEF ID LPAREN parameters RPAREN return_type COLON block
+Rule 12    parameters -> parameter_list
+Rule 13    parameters -> empty
+Rule 14    parameter_list -> parameter
+Rule 15    parameter_list -> parameter_list COMMA parameter
+Rule 16    parameter -> ID
+Rule 17    parameter -> ID COLON type
+Rule 18    return_type -> ARROW type
+Rule 19    return_type -> empty
+Rule 20    type -> INT
+Rule 21    type -> STR
+Rule 22    type -> FLOAT
+Rule 23    type -> BOOL
+Rule 24    type -> LIST
+Rule 25    type -> DICT
+Rule 26    if_statement -> IF expression COLON block
+Rule 27    if_statement -> IF expression COLON block ELSE COLON block
+Rule 28    return_statement -> RETURN expression
+Rule 29    return_statement -> RETURN
+Rule 30    expression_statement -> expression
+Rule 31    block -> INDENT declaration_list DEDENT
+Rule 32    expression -> assignment
+Rule 33    assignment -> ID ASSIGN assignment
+Rule 34    assignment -> comparison
+Rule 35    comparison -> sum
+Rule 36    comparison -> comparison EQ sum
+Rule 37    comparison -> comparison NE sum
+Rule 38    comparison -> comparison LT sum
+Rule 39    comparison -> comparison GT sum
+Rule 40    comparison -> comparison LE sum
+Rule 41    comparison -> comparison GE sum
+Rule 42    sum -> mult
+Rule 43    sum -> sum PLUS mult
+Rule 44    sum -> sum MINUS mult
+Rule 45    mult -> unary
+Rule 46    mult -> mult TIMES unary
+Rule 47    mult -> mult DIVIDE unary
+Rule 48    mult -> mult MOD unary
+Rule 49    unary -> primary
+Rule 50    unary -> MINUS unary
+Rule 51    unary -> NOT unary
+Rule 52    primary -> NUMBER
+Rule 53    primary -> STRING
+Rule 54    primary -> TRUE
+Rule 55    primary -> FALSE
+Rule 56    primary -> NONE
+Rule 57    primary -> LPAREN expression RPAREN
+Rule 58    primary -> ID
+Rule 59    primary -> call
+Rule 60    call -> ID LPAREN arguments RPAREN
+Rule 61    call -> ID LPAREN RPAREN
+Rule 62    arguments -> expression
+Rule 63    arguments -> arguments COMMA expression
+Rule 64    empty -> <empty>
+
+Terminals, with rules where they appear
+
+AND                  : 
+ARROW                : 18
+ASSIGN               : 10 33
+BOOL                 : 23
+CLASS                : 
+COLON                : 11 17 26 27 27
+COMMA                : 15 63
+DEDENT               : 31
+DEF                  : 11
+DICT                 : 25
+DIVIDE               : 47
+DOT                  : 
+ELSE                 : 27
+EQ                   : 36
+FALSE                : 55
+FLOAT                : 22
+FOR                  : 
+GE                   : 41
+GT                   : 39
+ID                   : 10 11 16 17 33 58 60 61
+IF                   : 26 27
+IN                   : 
+INDENT               : 31
+INT                  : 20
+LBRACE               : 
+LBRACKET             : 
+LE                   : 40
+LIST                 : 24
+LPAREN               : 11 57 60 61
+LT                   : 38
+MINUS                : 44 50
+MOD                  : 48
+NE                   : 37
+NEWLINE              : 9
+NONE                 : 56
+NOT                  : 51
+NUMBER               : 52
+OR                   : 
+PLUS                 : 43
+PRINT                : 
+RBRACE               : 
+RBRACKET             : 
+RETURN               : 28 29
+RPAREN               : 11 57 60 61
+SEMICOLON            : 
+STR                  : 21
+STRING               : 53
+TIMES                : 46
+TRUE                 : 54
+WHILE                : 
+error                : 
+
+Nonterminals, with rules where they appear
+
+arguments            : 60 63
+assignment           : 32 33
+block                : 11 26 27 27
+call                 : 59
+comparison           : 34 36 37 38 39 40 41
+declaration          : 2 3
+declaration_list     : 1 3 31
+empty                : 13 19
+expression           : 10 26 27 28 30 57 62 63
+expression_statement : 8
+fun_declaration      : 5
+if_statement         : 6
+mult                 : 42 43 44 46 47 48
+parameter            : 14 15
+parameter_list       : 12 15
+parameters           : 11
+primary              : 49
+program              : 0
+return_statement     : 7
+return_type          : 11
+sum                  : 35 36 37 38 39 40 41 43 44
+type                 : 17 18
+unary                : 45 46 47 48 50 51
+var_declaration      : 4
+
+Parsing method: LALR
+
+state 0
+
+    (0) S' -> . program
+    (1) program -> . declaration_list
+    (2) declaration_list -> . declaration
+    (3) declaration_list -> . declaration_list declaration
+    (4) declaration -> . var_declaration
+    (5) declaration -> . fun_declaration
+    (6) declaration -> . if_statement
+    (7) declaration -> . return_statement
+    (8) declaration -> . expression_statement
+    (9) declaration -> . NEWLINE
+    (10) var_declaration -> . ID ASSIGN expression
+    (11) fun_declaration -> . DEF ID LPAREN parameters RPAREN return_type COLON block
+    (26) if_statement -> . IF expression COLON block
+    (27) if_statement -> . IF expression COLON block ELSE COLON block
+    (28) return_statement -> . RETURN expression
+    (29) return_statement -> . RETURN
+    (30) expression_statement -> . expression
+    (32) expression -> . assignment
+    (33) assignment -> . ID ASSIGN assignment
+    (34) assignment -> . comparison
+    (35) comparison -> . sum
+    (36) comparison -> . comparison EQ sum
+    (37) comparison -> . comparison NE sum
+    (38) comparison -> . comparison LT sum
+    (39) comparison -> . comparison GT sum
+    (40) comparison -> . comparison LE sum
+    (41) comparison -> . comparison GE sum
+    (42) sum -> . mult
+    (43) sum -> . sum PLUS mult
+    (44) sum -> . sum MINUS mult
+    (45) mult -> . unary
+    (46) mult -> . mult TIMES unary
+    (47) mult -> . mult DIVIDE unary
+    (48) mult -> . mult MOD unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    NEWLINE         shift and go to state 9
+    ID              shift and go to state 10
+    DEF             shift and go to state 12
+    IF              shift and go to state 14
+    RETURN          shift and go to state 15
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+
+    program                        shift and go to state 1
+    declaration_list               shift and go to state 2
+    declaration                    shift and go to state 3
+    var_declaration                shift and go to state 4
+    fun_declaration                shift and go to state 5
+    if_statement                   shift and go to state 6
+    return_statement               shift and go to state 7
+    expression_statement           shift and go to state 8
+    expression                     shift and go to state 11
+    assignment                     shift and go to state 16
+    comparison                     shift and go to state 17
+    sum                            shift and go to state 18
+    mult                           shift and go to state 19
+    unary                          shift and go to state 21
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 1
+
+    (0) S' -> program .
+
+
+
+state 2
+
+    (1) program -> declaration_list .
+    (3) declaration_list -> declaration_list . declaration
+    (4) declaration -> . var_declaration
+    (5) declaration -> . fun_declaration
+    (6) declaration -> . if_statement
+    (7) declaration -> . return_statement
+    (8) declaration -> . expression_statement
+    (9) declaration -> . NEWLINE
+    (10) var_declaration -> . ID ASSIGN expression
+    (11) fun_declaration -> . DEF ID LPAREN parameters RPAREN return_type COLON block
+    (26) if_statement -> . IF expression COLON block
+    (27) if_statement -> . IF expression COLON block ELSE COLON block
+    (28) return_statement -> . RETURN expression
+    (29) return_statement -> . RETURN
+    (30) expression_statement -> . expression
+    (32) expression -> . assignment
+    (33) assignment -> . ID ASSIGN assignment
+    (34) assignment -> . comparison
+    (35) comparison -> . sum
+    (36) comparison -> . comparison EQ sum
+    (37) comparison -> . comparison NE sum
+    (38) comparison -> . comparison LT sum
+    (39) comparison -> . comparison GT sum
+    (40) comparison -> . comparison LE sum
+    (41) comparison -> . comparison GE sum
+    (42) sum -> . mult
+    (43) sum -> . sum PLUS mult
+    (44) sum -> . sum MINUS mult
+    (45) mult -> . unary
+    (46) mult -> . mult TIMES unary
+    (47) mult -> . mult DIVIDE unary
+    (48) mult -> . mult MOD unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    $end            reduce using rule 1 (program -> declaration_list .)
+    NEWLINE         shift and go to state 9
+    ID              shift and go to state 10
+    DEF             shift and go to state 12
+    IF              shift and go to state 14
+    RETURN          shift and go to state 15
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+
+    declaration                    shift and go to state 30
+    var_declaration                shift and go to state 4
+    fun_declaration                shift and go to state 5
+    if_statement                   shift and go to state 6
+    return_statement               shift and go to state 7
+    expression_statement           shift and go to state 8
+    expression                     shift and go to state 11
+    assignment                     shift and go to state 16
+    comparison                     shift and go to state 17
+    sum                            shift and go to state 18
+    mult                           shift and go to state 19
+    unary                          shift and go to state 21
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 3
+
+    (2) declaration_list -> declaration .
+
+    NEWLINE         reduce using rule 2 (declaration_list -> declaration .)
+    ID              reduce using rule 2 (declaration_list -> declaration .)
+    DEF             reduce using rule 2 (declaration_list -> declaration .)
+    IF              reduce using rule 2 (declaration_list -> declaration .)
+    RETURN          reduce using rule 2 (declaration_list -> declaration .)
+    MINUS           reduce using rule 2 (declaration_list -> declaration .)
+    NOT             reduce using rule 2 (declaration_list -> declaration .)
+    NUMBER          reduce using rule 2 (declaration_list -> declaration .)
+    STRING          reduce using rule 2 (declaration_list -> declaration .)
+    TRUE            reduce using rule 2 (declaration_list -> declaration .)
+    FALSE           reduce using rule 2 (declaration_list -> declaration .)
+    NONE            reduce using rule 2 (declaration_list -> declaration .)
+    LPAREN          reduce using rule 2 (declaration_list -> declaration .)
+    $end            reduce using rule 2 (declaration_list -> declaration .)
+    DEDENT          reduce using rule 2 (declaration_list -> declaration .)
+
+
+state 4
+
+    (4) declaration -> var_declaration .
+
+    NEWLINE         reduce using rule 4 (declaration -> var_declaration .)
+    ID              reduce using rule 4 (declaration -> var_declaration .)
+    DEF             reduce using rule 4 (declaration -> var_declaration .)
+    IF              reduce using rule 4 (declaration -> var_declaration .)
+    RETURN          reduce using rule 4 (declaration -> var_declaration .)
+    MINUS           reduce using rule 4 (declaration -> var_declaration .)
+    NOT             reduce using rule 4 (declaration -> var_declaration .)
+    NUMBER          reduce using rule 4 (declaration -> var_declaration .)
+    STRING          reduce using rule 4 (declaration -> var_declaration .)
+    TRUE            reduce using rule 4 (declaration -> var_declaration .)
+    FALSE           reduce using rule 4 (declaration -> var_declaration .)
+    NONE            reduce using rule 4 (declaration -> var_declaration .)
+    LPAREN          reduce using rule 4 (declaration -> var_declaration .)
+    $end            reduce using rule 4 (declaration -> var_declaration .)
+    DEDENT          reduce using rule 4 (declaration -> var_declaration .)
+
+
+state 5
+
+    (5) declaration -> fun_declaration .
+
+    NEWLINE         reduce using rule 5 (declaration -> fun_declaration .)
+    ID              reduce using rule 5 (declaration -> fun_declaration .)
+    DEF             reduce using rule 5 (declaration -> fun_declaration .)
+    IF              reduce using rule 5 (declaration -> fun_declaration .)
+    RETURN          reduce using rule 5 (declaration -> fun_declaration .)
+    MINUS           reduce using rule 5 (declaration -> fun_declaration .)
+    NOT             reduce using rule 5 (declaration -> fun_declaration .)
+    NUMBER          reduce using rule 5 (declaration -> fun_declaration .)
+    STRING          reduce using rule 5 (declaration -> fun_declaration .)
+    TRUE            reduce using rule 5 (declaration -> fun_declaration .)
+    FALSE           reduce using rule 5 (declaration -> fun_declaration .)
+    NONE            reduce using rule 5 (declaration -> fun_declaration .)
+    LPAREN          reduce using rule 5 (declaration -> fun_declaration .)
+    $end            reduce using rule 5 (declaration -> fun_declaration .)
+    DEDENT          reduce using rule 5 (declaration -> fun_declaration .)
+
+
+state 6
+
+    (6) declaration -> if_statement .
+
+    NEWLINE         reduce using rule 6 (declaration -> if_statement .)
+    ID              reduce using rule 6 (declaration -> if_statement .)
+    DEF             reduce using rule 6 (declaration -> if_statement .)
+    IF              reduce using rule 6 (declaration -> if_statement .)
+    RETURN          reduce using rule 6 (declaration -> if_statement .)
+    MINUS           reduce using rule 6 (declaration -> if_statement .)
+    NOT             reduce using rule 6 (declaration -> if_statement .)
+    NUMBER          reduce using rule 6 (declaration -> if_statement .)
+    STRING          reduce using rule 6 (declaration -> if_statement .)
+    TRUE            reduce using rule 6 (declaration -> if_statement .)
+    FALSE           reduce using rule 6 (declaration -> if_statement .)
+    NONE            reduce using rule 6 (declaration -> if_statement .)
+    LPAREN          reduce using rule 6 (declaration -> if_statement .)
+    $end            reduce using rule 6 (declaration -> if_statement .)
+    DEDENT          reduce using rule 6 (declaration -> if_statement .)
+
+
+state 7
+
+    (7) declaration -> return_statement .
+
+    NEWLINE         reduce using rule 7 (declaration -> return_statement .)
+    ID              reduce using rule 7 (declaration -> return_statement .)
+    DEF             reduce using rule 7 (declaration -> return_statement .)
+    IF              reduce using rule 7 (declaration -> return_statement .)
+    RETURN          reduce using rule 7 (declaration -> return_statement .)
+    MINUS           reduce using rule 7 (declaration -> return_statement .)
+    NOT             reduce using rule 7 (declaration -> return_statement .)
+    NUMBER          reduce using rule 7 (declaration -> return_statement .)
+    STRING          reduce using rule 7 (declaration -> return_statement .)
+    TRUE            reduce using rule 7 (declaration -> return_statement .)
+    FALSE           reduce using rule 7 (declaration -> return_statement .)
+    NONE            reduce using rule 7 (declaration -> return_statement .)
+    LPAREN          reduce using rule 7 (declaration -> return_statement .)
+    $end            reduce using rule 7 (declaration -> return_statement .)
+    DEDENT          reduce using rule 7 (declaration -> return_statement .)
+
+
+state 8
+
+    (8) declaration -> expression_statement .
+
+    NEWLINE         reduce using rule 8 (declaration -> expression_statement .)
+    ID              reduce using rule 8 (declaration -> expression_statement .)
+    DEF             reduce using rule 8 (declaration -> expression_statement .)
+    IF              reduce using rule 8 (declaration -> expression_statement .)
+    RETURN          reduce using rule 8 (declaration -> expression_statement .)
+    MINUS           reduce using rule 8 (declaration -> expression_statement .)
+    NOT             reduce using rule 8 (declaration -> expression_statement .)
+    NUMBER          reduce using rule 8 (declaration -> expression_statement .)
+    STRING          reduce using rule 8 (declaration -> expression_statement .)
+    TRUE            reduce using rule 8 (declaration -> expression_statement .)
+    FALSE           reduce using rule 8 (declaration -> expression_statement .)
+    NONE            reduce using rule 8 (declaration -> expression_statement .)
+    LPAREN          reduce using rule 8 (declaration -> expression_statement .)
+    $end            reduce using rule 8 (declaration -> expression_statement .)
+    DEDENT          reduce using rule 8 (declaration -> expression_statement .)
+
+
+state 9
+
+    (9) declaration -> NEWLINE .
+
+    NEWLINE         reduce using rule 9 (declaration -> NEWLINE .)
+    ID              reduce using rule 9 (declaration -> NEWLINE .)
+    DEF             reduce using rule 9 (declaration -> NEWLINE .)
+    IF              reduce using rule 9 (declaration -> NEWLINE .)
+    RETURN          reduce using rule 9 (declaration -> NEWLINE .)
+    MINUS           reduce using rule 9 (declaration -> NEWLINE .)
+    NOT             reduce using rule 9 (declaration -> NEWLINE .)
+    NUMBER          reduce using rule 9 (declaration -> NEWLINE .)
+    STRING          reduce using rule 9 (declaration -> NEWLINE .)
+    TRUE            reduce using rule 9 (declaration -> NEWLINE .)
+    FALSE           reduce using rule 9 (declaration -> NEWLINE .)
+    NONE            reduce using rule 9 (declaration -> NEWLINE .)
+    LPAREN          reduce using rule 9 (declaration -> NEWLINE .)
+    $end            reduce using rule 9 (declaration -> NEWLINE .)
+    DEDENT          reduce using rule 9 (declaration -> NEWLINE .)
+
+
+state 10
+
+    (10) var_declaration -> ID . ASSIGN expression
+    (33) assignment -> ID . ASSIGN assignment
+    (58) primary -> ID .
+    (60) call -> ID . LPAREN arguments RPAREN
+    (61) call -> ID . LPAREN RPAREN
+
+  ! shift/reduce conflict for LPAREN resolved as shift
+    ASSIGN          shift and go to state 31
+    TIMES           reduce using rule 58 (primary -> ID .)
+    DIVIDE          reduce using rule 58 (primary -> ID .)
+    MOD             reduce using rule 58 (primary -> ID .)
+    PLUS            reduce using rule 58 (primary -> ID .)
+    MINUS           reduce using rule 58 (primary -> ID .)
+    EQ              reduce using rule 58 (primary -> ID .)
+    NE              reduce using rule 58 (primary -> ID .)
+    LT              reduce using rule 58 (primary -> ID .)
+    GT              reduce using rule 58 (primary -> ID .)
+    LE              reduce using rule 58 (primary -> ID .)
+    GE              reduce using rule 58 (primary -> ID .)
+    NEWLINE         reduce using rule 58 (primary -> ID .)
+    ID              reduce using rule 58 (primary -> ID .)
+    DEF             reduce using rule 58 (primary -> ID .)
+    IF              reduce using rule 58 (primary -> ID .)
+    RETURN          reduce using rule 58 (primary -> ID .)
+    NOT             reduce using rule 58 (primary -> ID .)
+    NUMBER          reduce using rule 58 (primary -> ID .)
+    STRING          reduce using rule 58 (primary -> ID .)
+    TRUE            reduce using rule 58 (primary -> ID .)
+    FALSE           reduce using rule 58 (primary -> ID .)
+    NONE            reduce using rule 58 (primary -> ID .)
+    $end            reduce using rule 58 (primary -> ID .)
+    DEDENT          reduce using rule 58 (primary -> ID .)
+    LPAREN          shift and go to state 32
+
+  ! LPAREN          [ reduce using rule 58 (primary -> ID .) ]
+
+
+state 11
+
+    (30) expression_statement -> expression .
+
+    NEWLINE         reduce using rule 30 (expression_statement -> expression .)
+    ID              reduce using rule 30 (expression_statement -> expression .)
+    DEF             reduce using rule 30 (expression_statement -> expression .)
+    IF              reduce using rule 30 (expression_statement -> expression .)
+    RETURN          reduce using rule 30 (expression_statement -> expression .)
+    MINUS           reduce using rule 30 (expression_statement -> expression .)
+    NOT             reduce using rule 30 (expression_statement -> expression .)
+    NUMBER          reduce using rule 30 (expression_statement -> expression .)
+    STRING          reduce using rule 30 (expression_statement -> expression .)
+    TRUE            reduce using rule 30 (expression_statement -> expression .)
+    FALSE           reduce using rule 30 (expression_statement -> expression .)
+    NONE            reduce using rule 30 (expression_statement -> expression .)
+    LPAREN          reduce using rule 30 (expression_statement -> expression .)
+    $end            reduce using rule 30 (expression_statement -> expression .)
+    DEDENT          reduce using rule 30 (expression_statement -> expression .)
+
+
+state 12
+
+    (11) fun_declaration -> DEF . ID LPAREN parameters RPAREN return_type COLON block
+
+    ID              shift and go to state 33
+
+
+state 13
+
+    (57) primary -> LPAREN . expression RPAREN
+    (32) expression -> . assignment
+    (33) assignment -> . ID ASSIGN assignment
+    (34) assignment -> . comparison
+    (35) comparison -> . sum
+    (36) comparison -> . comparison EQ sum
+    (37) comparison -> . comparison NE sum
+    (38) comparison -> . comparison LT sum
+    (39) comparison -> . comparison GT sum
+    (40) comparison -> . comparison LE sum
+    (41) comparison -> . comparison GE sum
+    (42) sum -> . mult
+    (43) sum -> . sum PLUS mult
+    (44) sum -> . sum MINUS mult
+    (45) mult -> . unary
+    (46) mult -> . mult TIMES unary
+    (47) mult -> . mult DIVIDE unary
+    (48) mult -> . mult MOD unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    ID              shift and go to state 35
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+
+    expression                     shift and go to state 34
+    assignment                     shift and go to state 16
+    comparison                     shift and go to state 17
+    sum                            shift and go to state 18
+    mult                           shift and go to state 19
+    unary                          shift and go to state 21
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 14
+
+    (26) if_statement -> IF . expression COLON block
+    (27) if_statement -> IF . expression COLON block ELSE COLON block
+    (32) expression -> . assignment
+    (33) assignment -> . ID ASSIGN assignment
+    (34) assignment -> . comparison
+    (35) comparison -> . sum
+    (36) comparison -> . comparison EQ sum
+    (37) comparison -> . comparison NE sum
+    (38) comparison -> . comparison LT sum
+    (39) comparison -> . comparison GT sum
+    (40) comparison -> . comparison LE sum
+    (41) comparison -> . comparison GE sum
+    (42) sum -> . mult
+    (43) sum -> . sum PLUS mult
+    (44) sum -> . sum MINUS mult
+    (45) mult -> . unary
+    (46) mult -> . mult TIMES unary
+    (47) mult -> . mult DIVIDE unary
+    (48) mult -> . mult MOD unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    ID              shift and go to state 35
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+
+    expression                     shift and go to state 36
+    assignment                     shift and go to state 16
+    comparison                     shift and go to state 17
+    sum                            shift and go to state 18
+    mult                           shift and go to state 19
+    unary                          shift and go to state 21
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 15
+
+    (28) return_statement -> RETURN . expression
+    (29) return_statement -> RETURN .
+    (32) expression -> . assignment
+    (33) assignment -> . ID ASSIGN assignment
+    (34) assignment -> . comparison
+    (35) comparison -> . sum
+    (36) comparison -> . comparison EQ sum
+    (37) comparison -> . comparison NE sum
+    (38) comparison -> . comparison LT sum
+    (39) comparison -> . comparison GT sum
+    (40) comparison -> . comparison LE sum
+    (41) comparison -> . comparison GE sum
+    (42) sum -> . mult
+    (43) sum -> . sum PLUS mult
+    (44) sum -> . sum MINUS mult
+    (45) mult -> . unary
+    (46) mult -> . mult TIMES unary
+    (47) mult -> . mult DIVIDE unary
+    (48) mult -> . mult MOD unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+  ! shift/reduce conflict for ID resolved as shift
+  ! shift/reduce conflict for MINUS resolved as shift
+  ! shift/reduce conflict for NOT resolved as shift
+  ! shift/reduce conflict for NUMBER resolved as shift
+  ! shift/reduce conflict for STRING resolved as shift
+  ! shift/reduce conflict for TRUE resolved as shift
+  ! shift/reduce conflict for FALSE resolved as shift
+  ! shift/reduce conflict for NONE resolved as shift
+  ! shift/reduce conflict for LPAREN resolved as shift
+    NEWLINE         reduce using rule 29 (return_statement -> RETURN .)
+    DEF             reduce using rule 29 (return_statement -> RETURN .)
+    IF              reduce using rule 29 (return_statement -> RETURN .)
+    RETURN          reduce using rule 29 (return_statement -> RETURN .)
+    $end            reduce using rule 29 (return_statement -> RETURN .)
+    DEDENT          reduce using rule 29 (return_statement -> RETURN .)
+    ID              shift and go to state 35
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+
+  ! ID              [ reduce using rule 29 (return_statement -> RETURN .) ]
+  ! MINUS           [ reduce using rule 29 (return_statement -> RETURN .) ]
+  ! NOT             [ reduce using rule 29 (return_statement -> RETURN .) ]
+  ! NUMBER          [ reduce using rule 29 (return_statement -> RETURN .) ]
+  ! STRING          [ reduce using rule 29 (return_statement -> RETURN .) ]
+  ! TRUE            [ reduce using rule 29 (return_statement -> RETURN .) ]
+  ! FALSE           [ reduce using rule 29 (return_statement -> RETURN .) ]
+  ! NONE            [ reduce using rule 29 (return_statement -> RETURN .) ]
+  ! LPAREN          [ reduce using rule 29 (return_statement -> RETURN .) ]
+
+    expression                     shift and go to state 37
+    assignment                     shift and go to state 16
+    comparison                     shift and go to state 17
+    sum                            shift and go to state 18
+    mult                           shift and go to state 19
+    unary                          shift and go to state 21
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 16
+
+    (32) expression -> assignment .
+
+    NEWLINE         reduce using rule 32 (expression -> assignment .)
+    ID              reduce using rule 32 (expression -> assignment .)
+    DEF             reduce using rule 32 (expression -> assignment .)
+    IF              reduce using rule 32 (expression -> assignment .)
+    RETURN          reduce using rule 32 (expression -> assignment .)
+    MINUS           reduce using rule 32 (expression -> assignment .)
+    NOT             reduce using rule 32 (expression -> assignment .)
+    NUMBER          reduce using rule 32 (expression -> assignment .)
+    STRING          reduce using rule 32 (expression -> assignment .)
+    TRUE            reduce using rule 32 (expression -> assignment .)
+    FALSE           reduce using rule 32 (expression -> assignment .)
+    NONE            reduce using rule 32 (expression -> assignment .)
+    LPAREN          reduce using rule 32 (expression -> assignment .)
+    $end            reduce using rule 32 (expression -> assignment .)
+    RPAREN          reduce using rule 32 (expression -> assignment .)
+    COLON           reduce using rule 32 (expression -> assignment .)
+    DEDENT          reduce using rule 32 (expression -> assignment .)
+    COMMA           reduce using rule 32 (expression -> assignment .)
+
+
+state 17
+
+    (34) assignment -> comparison .
+    (36) comparison -> comparison . EQ sum
+    (37) comparison -> comparison . NE sum
+    (38) comparison -> comparison . LT sum
+    (39) comparison -> comparison . GT sum
+    (40) comparison -> comparison . LE sum
+    (41) comparison -> comparison . GE sum
+
+    NEWLINE         reduce using rule 34 (assignment -> comparison .)
+    ID              reduce using rule 34 (assignment -> comparison .)
+    DEF             reduce using rule 34 (assignment -> comparison .)
+    IF              reduce using rule 34 (assignment -> comparison .)
+    RETURN          reduce using rule 34 (assignment -> comparison .)
+    MINUS           reduce using rule 34 (assignment -> comparison .)
+    NOT             reduce using rule 34 (assignment -> comparison .)
+    NUMBER          reduce using rule 34 (assignment -> comparison .)
+    STRING          reduce using rule 34 (assignment -> comparison .)
+    TRUE            reduce using rule 34 (assignment -> comparison .)
+    FALSE           reduce using rule 34 (assignment -> comparison .)
+    NONE            reduce using rule 34 (assignment -> comparison .)
+    LPAREN          reduce using rule 34 (assignment -> comparison .)
+    $end            reduce using rule 34 (assignment -> comparison .)
+    RPAREN          reduce using rule 34 (assignment -> comparison .)
+    COLON           reduce using rule 34 (assignment -> comparison .)
+    DEDENT          reduce using rule 34 (assignment -> comparison .)
+    COMMA           reduce using rule 34 (assignment -> comparison .)
+    EQ              shift and go to state 38
+    NE              shift and go to state 39
+    LT              shift and go to state 40
+    GT              shift and go to state 41
+    LE              shift and go to state 42
+    GE              shift and go to state 43
+
+
+state 18
+
+    (35) comparison -> sum .
+    (43) sum -> sum . PLUS mult
+    (44) sum -> sum . MINUS mult
+
+  ! shift/reduce conflict for MINUS resolved as shift
+    EQ              reduce using rule 35 (comparison -> sum .)
+    NE              reduce using rule 35 (comparison -> sum .)
+    LT              reduce using rule 35 (comparison -> sum .)
+    GT              reduce using rule 35 (comparison -> sum .)
+    LE              reduce using rule 35 (comparison -> sum .)
+    GE              reduce using rule 35 (comparison -> sum .)
+    NEWLINE         reduce using rule 35 (comparison -> sum .)
+    ID              reduce using rule 35 (comparison -> sum .)
+    DEF             reduce using rule 35 (comparison -> sum .)
+    IF              reduce using rule 35 (comparison -> sum .)
+    RETURN          reduce using rule 35 (comparison -> sum .)
+    NOT             reduce using rule 35 (comparison -> sum .)
+    NUMBER          reduce using rule 35 (comparison -> sum .)
+    STRING          reduce using rule 35 (comparison -> sum .)
+    TRUE            reduce using rule 35 (comparison -> sum .)
+    FALSE           reduce using rule 35 (comparison -> sum .)
+    NONE            reduce using rule 35 (comparison -> sum .)
+    LPAREN          reduce using rule 35 (comparison -> sum .)
+    $end            reduce using rule 35 (comparison -> sum .)
+    RPAREN          reduce using rule 35 (comparison -> sum .)
+    COLON           reduce using rule 35 (comparison -> sum .)
+    DEDENT          reduce using rule 35 (comparison -> sum .)
+    COMMA           reduce using rule 35 (comparison -> sum .)
+    PLUS            shift and go to state 44
+    MINUS           shift and go to state 45
+
+  ! MINUS           [ reduce using rule 35 (comparison -> sum .) ]
+
+
+state 19
+
+    (42) sum -> mult .
+    (46) mult -> mult . TIMES unary
+    (47) mult -> mult . DIVIDE unary
+    (48) mult -> mult . MOD unary
+
+    PLUS            reduce using rule 42 (sum -> mult .)
+    MINUS           reduce using rule 42 (sum -> mult .)
+    EQ              reduce using rule 42 (sum -> mult .)
+    NE              reduce using rule 42 (sum -> mult .)
+    LT              reduce using rule 42 (sum -> mult .)
+    GT              reduce using rule 42 (sum -> mult .)
+    LE              reduce using rule 42 (sum -> mult .)
+    GE              reduce using rule 42 (sum -> mult .)
+    NEWLINE         reduce using rule 42 (sum -> mult .)
+    ID              reduce using rule 42 (sum -> mult .)
+    DEF             reduce using rule 42 (sum -> mult .)
+    IF              reduce using rule 42 (sum -> mult .)
+    RETURN          reduce using rule 42 (sum -> mult .)
+    NOT             reduce using rule 42 (sum -> mult .)
+    NUMBER          reduce using rule 42 (sum -> mult .)
+    STRING          reduce using rule 42 (sum -> mult .)
+    TRUE            reduce using rule 42 (sum -> mult .)
+    FALSE           reduce using rule 42 (sum -> mult .)
+    NONE            reduce using rule 42 (sum -> mult .)
+    LPAREN          reduce using rule 42 (sum -> mult .)
+    $end            reduce using rule 42 (sum -> mult .)
+    RPAREN          reduce using rule 42 (sum -> mult .)
+    COLON           reduce using rule 42 (sum -> mult .)
+    DEDENT          reduce using rule 42 (sum -> mult .)
+    COMMA           reduce using rule 42 (sum -> mult .)
+    TIMES           shift and go to state 46
+    DIVIDE          shift and go to state 47
+    MOD             shift and go to state 48
+
+
+state 20
+
+    (50) unary -> MINUS . unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+    ID              shift and go to state 50
+
+    unary                          shift and go to state 49
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 21
+
+    (45) mult -> unary .
+
+    TIMES           reduce using rule 45 (mult -> unary .)
+    DIVIDE          reduce using rule 45 (mult -> unary .)
+    MOD             reduce using rule 45 (mult -> unary .)
+    PLUS            reduce using rule 45 (mult -> unary .)
+    MINUS           reduce using rule 45 (mult -> unary .)
+    EQ              reduce using rule 45 (mult -> unary .)
+    NE              reduce using rule 45 (mult -> unary .)
+    LT              reduce using rule 45 (mult -> unary .)
+    GT              reduce using rule 45 (mult -> unary .)
+    LE              reduce using rule 45 (mult -> unary .)
+    GE              reduce using rule 45 (mult -> unary .)
+    NEWLINE         reduce using rule 45 (mult -> unary .)
+    ID              reduce using rule 45 (mult -> unary .)
+    DEF             reduce using rule 45 (mult -> unary .)
+    IF              reduce using rule 45 (mult -> unary .)
+    RETURN          reduce using rule 45 (mult -> unary .)
+    NOT             reduce using rule 45 (mult -> unary .)
+    NUMBER          reduce using rule 45 (mult -> unary .)
+    STRING          reduce using rule 45 (mult -> unary .)
+    TRUE            reduce using rule 45 (mult -> unary .)
+    FALSE           reduce using rule 45 (mult -> unary .)
+    NONE            reduce using rule 45 (mult -> unary .)
+    LPAREN          reduce using rule 45 (mult -> unary .)
+    $end            reduce using rule 45 (mult -> unary .)
+    RPAREN          reduce using rule 45 (mult -> unary .)
+    COLON           reduce using rule 45 (mult -> unary .)
+    DEDENT          reduce using rule 45 (mult -> unary .)
+    COMMA           reduce using rule 45 (mult -> unary .)
+
+
+state 22
+
+    (49) unary -> primary .
+
+    TIMES           reduce using rule 49 (unary -> primary .)
+    DIVIDE          reduce using rule 49 (unary -> primary .)
+    MOD             reduce using rule 49 (unary -> primary .)
+    PLUS            reduce using rule 49 (unary -> primary .)
+    MINUS           reduce using rule 49 (unary -> primary .)
+    EQ              reduce using rule 49 (unary -> primary .)
+    NE              reduce using rule 49 (unary -> primary .)
+    LT              reduce using rule 49 (unary -> primary .)
+    GT              reduce using rule 49 (unary -> primary .)
+    LE              reduce using rule 49 (unary -> primary .)
+    GE              reduce using rule 49 (unary -> primary .)
+    NEWLINE         reduce using rule 49 (unary -> primary .)
+    ID              reduce using rule 49 (unary -> primary .)
+    DEF             reduce using rule 49 (unary -> primary .)
+    IF              reduce using rule 49 (unary -> primary .)
+    RETURN          reduce using rule 49 (unary -> primary .)
+    NOT             reduce using rule 49 (unary -> primary .)
+    NUMBER          reduce using rule 49 (unary -> primary .)
+    STRING          reduce using rule 49 (unary -> primary .)
+    TRUE            reduce using rule 49 (unary -> primary .)
+    FALSE           reduce using rule 49 (unary -> primary .)
+    NONE            reduce using rule 49 (unary -> primary .)
+    LPAREN          reduce using rule 49 (unary -> primary .)
+    $end            reduce using rule 49 (unary -> primary .)
+    RPAREN          reduce using rule 49 (unary -> primary .)
+    COLON           reduce using rule 49 (unary -> primary .)
+    DEDENT          reduce using rule 49 (unary -> primary .)
+    COMMA           reduce using rule 49 (unary -> primary .)
+
+
+state 23
+
+    (51) unary -> NOT . unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+    ID              shift and go to state 50
+
+    unary                          shift and go to state 51
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 24
+
+    (52) primary -> NUMBER .
+
+    TIMES           reduce using rule 52 (primary -> NUMBER .)
+    DIVIDE          reduce using rule 52 (primary -> NUMBER .)
+    MOD             reduce using rule 52 (primary -> NUMBER .)
+    PLUS            reduce using rule 52 (primary -> NUMBER .)
+    MINUS           reduce using rule 52 (primary -> NUMBER .)
+    EQ              reduce using rule 52 (primary -> NUMBER .)
+    NE              reduce using rule 52 (primary -> NUMBER .)
+    LT              reduce using rule 52 (primary -> NUMBER .)
+    GT              reduce using rule 52 (primary -> NUMBER .)
+    LE              reduce using rule 52 (primary -> NUMBER .)
+    GE              reduce using rule 52 (primary -> NUMBER .)
+    NEWLINE         reduce using rule 52 (primary -> NUMBER .)
+    ID              reduce using rule 52 (primary -> NUMBER .)
+    DEF             reduce using rule 52 (primary -> NUMBER .)
+    IF              reduce using rule 52 (primary -> NUMBER .)
+    RETURN          reduce using rule 52 (primary -> NUMBER .)
+    NOT             reduce using rule 52 (primary -> NUMBER .)
+    NUMBER          reduce using rule 52 (primary -> NUMBER .)
+    STRING          reduce using rule 52 (primary -> NUMBER .)
+    TRUE            reduce using rule 52 (primary -> NUMBER .)
+    FALSE           reduce using rule 52 (primary -> NUMBER .)
+    NONE            reduce using rule 52 (primary -> NUMBER .)
+    LPAREN          reduce using rule 52 (primary -> NUMBER .)
+    $end            reduce using rule 52 (primary -> NUMBER .)
+    RPAREN          reduce using rule 52 (primary -> NUMBER .)
+    COLON           reduce using rule 52 (primary -> NUMBER .)
+    DEDENT          reduce using rule 52 (primary -> NUMBER .)
+    COMMA           reduce using rule 52 (primary -> NUMBER .)
+
+
+state 25
+
+    (53) primary -> STRING .
+
+    TIMES           reduce using rule 53 (primary -> STRING .)
+    DIVIDE          reduce using rule 53 (primary -> STRING .)
+    MOD             reduce using rule 53 (primary -> STRING .)
+    PLUS            reduce using rule 53 (primary -> STRING .)
+    MINUS           reduce using rule 53 (primary -> STRING .)
+    EQ              reduce using rule 53 (primary -> STRING .)
+    NE              reduce using rule 53 (primary -> STRING .)
+    LT              reduce using rule 53 (primary -> STRING .)
+    GT              reduce using rule 53 (primary -> STRING .)
+    LE              reduce using rule 53 (primary -> STRING .)
+    GE              reduce using rule 53 (primary -> STRING .)
+    NEWLINE         reduce using rule 53 (primary -> STRING .)
+    ID              reduce using rule 53 (primary -> STRING .)
+    DEF             reduce using rule 53 (primary -> STRING .)
+    IF              reduce using rule 53 (primary -> STRING .)
+    RETURN          reduce using rule 53 (primary -> STRING .)
+    NOT             reduce using rule 53 (primary -> STRING .)
+    NUMBER          reduce using rule 53 (primary -> STRING .)
+    STRING          reduce using rule 53 (primary -> STRING .)
+    TRUE            reduce using rule 53 (primary -> STRING .)
+    FALSE           reduce using rule 53 (primary -> STRING .)
+    NONE            reduce using rule 53 (primary -> STRING .)
+    LPAREN          reduce using rule 53 (primary -> STRING .)
+    $end            reduce using rule 53 (primary -> STRING .)
+    RPAREN          reduce using rule 53 (primary -> STRING .)
+    COLON           reduce using rule 53 (primary -> STRING .)
+    DEDENT          reduce using rule 53 (primary -> STRING .)
+    COMMA           reduce using rule 53 (primary -> STRING .)
+
+
+state 26
+
+    (54) primary -> TRUE .
+
+    TIMES           reduce using rule 54 (primary -> TRUE .)
+    DIVIDE          reduce using rule 54 (primary -> TRUE .)
+    MOD             reduce using rule 54 (primary -> TRUE .)
+    PLUS            reduce using rule 54 (primary -> TRUE .)
+    MINUS           reduce using rule 54 (primary -> TRUE .)
+    EQ              reduce using rule 54 (primary -> TRUE .)
+    NE              reduce using rule 54 (primary -> TRUE .)
+    LT              reduce using rule 54 (primary -> TRUE .)
+    GT              reduce using rule 54 (primary -> TRUE .)
+    LE              reduce using rule 54 (primary -> TRUE .)
+    GE              reduce using rule 54 (primary -> TRUE .)
+    NEWLINE         reduce using rule 54 (primary -> TRUE .)
+    ID              reduce using rule 54 (primary -> TRUE .)
+    DEF             reduce using rule 54 (primary -> TRUE .)
+    IF              reduce using rule 54 (primary -> TRUE .)
+    RETURN          reduce using rule 54 (primary -> TRUE .)
+    NOT             reduce using rule 54 (primary -> TRUE .)
+    NUMBER          reduce using rule 54 (primary -> TRUE .)
+    STRING          reduce using rule 54 (primary -> TRUE .)
+    TRUE            reduce using rule 54 (primary -> TRUE .)
+    FALSE           reduce using rule 54 (primary -> TRUE .)
+    NONE            reduce using rule 54 (primary -> TRUE .)
+    LPAREN          reduce using rule 54 (primary -> TRUE .)
+    $end            reduce using rule 54 (primary -> TRUE .)
+    RPAREN          reduce using rule 54 (primary -> TRUE .)
+    COLON           reduce using rule 54 (primary -> TRUE .)
+    DEDENT          reduce using rule 54 (primary -> TRUE .)
+    COMMA           reduce using rule 54 (primary -> TRUE .)
+
+
+state 27
+
+    (55) primary -> FALSE .
+
+    TIMES           reduce using rule 55 (primary -> FALSE .)
+    DIVIDE          reduce using rule 55 (primary -> FALSE .)
+    MOD             reduce using rule 55 (primary -> FALSE .)
+    PLUS            reduce using rule 55 (primary -> FALSE .)
+    MINUS           reduce using rule 55 (primary -> FALSE .)
+    EQ              reduce using rule 55 (primary -> FALSE .)
+    NE              reduce using rule 55 (primary -> FALSE .)
+    LT              reduce using rule 55 (primary -> FALSE .)
+    GT              reduce using rule 55 (primary -> FALSE .)
+    LE              reduce using rule 55 (primary -> FALSE .)
+    GE              reduce using rule 55 (primary -> FALSE .)
+    NEWLINE         reduce using rule 55 (primary -> FALSE .)
+    ID              reduce using rule 55 (primary -> FALSE .)
+    DEF             reduce using rule 55 (primary -> FALSE .)
+    IF              reduce using rule 55 (primary -> FALSE .)
+    RETURN          reduce using rule 55 (primary -> FALSE .)
+    NOT             reduce using rule 55 (primary -> FALSE .)
+    NUMBER          reduce using rule 55 (primary -> FALSE .)
+    STRING          reduce using rule 55 (primary -> FALSE .)
+    TRUE            reduce using rule 55 (primary -> FALSE .)
+    FALSE           reduce using rule 55 (primary -> FALSE .)
+    NONE            reduce using rule 55 (primary -> FALSE .)
+    LPAREN          reduce using rule 55 (primary -> FALSE .)
+    $end            reduce using rule 55 (primary -> FALSE .)
+    RPAREN          reduce using rule 55 (primary -> FALSE .)
+    COLON           reduce using rule 55 (primary -> FALSE .)
+    DEDENT          reduce using rule 55 (primary -> FALSE .)
+    COMMA           reduce using rule 55 (primary -> FALSE .)
+
+
+state 28
+
+    (56) primary -> NONE .
+
+    TIMES           reduce using rule 56 (primary -> NONE .)
+    DIVIDE          reduce using rule 56 (primary -> NONE .)
+    MOD             reduce using rule 56 (primary -> NONE .)
+    PLUS            reduce using rule 56 (primary -> NONE .)
+    MINUS           reduce using rule 56 (primary -> NONE .)
+    EQ              reduce using rule 56 (primary -> NONE .)
+    NE              reduce using rule 56 (primary -> NONE .)
+    LT              reduce using rule 56 (primary -> NONE .)
+    GT              reduce using rule 56 (primary -> NONE .)
+    LE              reduce using rule 56 (primary -> NONE .)
+    GE              reduce using rule 56 (primary -> NONE .)
+    NEWLINE         reduce using rule 56 (primary -> NONE .)
+    ID              reduce using rule 56 (primary -> NONE .)
+    DEF             reduce using rule 56 (primary -> NONE .)
+    IF              reduce using rule 56 (primary -> NONE .)
+    RETURN          reduce using rule 56 (primary -> NONE .)
+    NOT             reduce using rule 56 (primary -> NONE .)
+    NUMBER          reduce using rule 56 (primary -> NONE .)
+    STRING          reduce using rule 56 (primary -> NONE .)
+    TRUE            reduce using rule 56 (primary -> NONE .)
+    FALSE           reduce using rule 56 (primary -> NONE .)
+    NONE            reduce using rule 56 (primary -> NONE .)
+    LPAREN          reduce using rule 56 (primary -> NONE .)
+    $end            reduce using rule 56 (primary -> NONE .)
+    RPAREN          reduce using rule 56 (primary -> NONE .)
+    COLON           reduce using rule 56 (primary -> NONE .)
+    DEDENT          reduce using rule 56 (primary -> NONE .)
+    COMMA           reduce using rule 56 (primary -> NONE .)
+
+
+state 29
+
+    (59) primary -> call .
+
+    TIMES           reduce using rule 59 (primary -> call .)
+    DIVIDE          reduce using rule 59 (primary -> call .)
+    MOD             reduce using rule 59 (primary -> call .)
+    PLUS            reduce using rule 59 (primary -> call .)
+    MINUS           reduce using rule 59 (primary -> call .)
+    EQ              reduce using rule 59 (primary -> call .)
+    NE              reduce using rule 59 (primary -> call .)
+    LT              reduce using rule 59 (primary -> call .)
+    GT              reduce using rule 59 (primary -> call .)
+    LE              reduce using rule 59 (primary -> call .)
+    GE              reduce using rule 59 (primary -> call .)
+    NEWLINE         reduce using rule 59 (primary -> call .)
+    ID              reduce using rule 59 (primary -> call .)
+    DEF             reduce using rule 59 (primary -> call .)
+    IF              reduce using rule 59 (primary -> call .)
+    RETURN          reduce using rule 59 (primary -> call .)
+    NOT             reduce using rule 59 (primary -> call .)
+    NUMBER          reduce using rule 59 (primary -> call .)
+    STRING          reduce using rule 59 (primary -> call .)
+    TRUE            reduce using rule 59 (primary -> call .)
+    FALSE           reduce using rule 59 (primary -> call .)
+    NONE            reduce using rule 59 (primary -> call .)
+    LPAREN          reduce using rule 59 (primary -> call .)
+    $end            reduce using rule 59 (primary -> call .)
+    RPAREN          reduce using rule 59 (primary -> call .)
+    COLON           reduce using rule 59 (primary -> call .)
+    DEDENT          reduce using rule 59 (primary -> call .)
+    COMMA           reduce using rule 59 (primary -> call .)
+
+
+state 30
+
+    (3) declaration_list -> declaration_list declaration .
+
+    NEWLINE         reduce using rule 3 (declaration_list -> declaration_list declaration .)
+    ID              reduce using rule 3 (declaration_list -> declaration_list declaration .)
+    DEF             reduce using rule 3 (declaration_list -> declaration_list declaration .)
+    IF              reduce using rule 3 (declaration_list -> declaration_list declaration .)
+    RETURN          reduce using rule 3 (declaration_list -> declaration_list declaration .)
+    MINUS           reduce using rule 3 (declaration_list -> declaration_list declaration .)
+    NOT             reduce using rule 3 (declaration_list -> declaration_list declaration .)
+    NUMBER          reduce using rule 3 (declaration_list -> declaration_list declaration .)
+    STRING          reduce using rule 3 (declaration_list -> declaration_list declaration .)
+    TRUE            reduce using rule 3 (declaration_list -> declaration_list declaration .)
+    FALSE           reduce using rule 3 (declaration_list -> declaration_list declaration .)
+    NONE            reduce using rule 3 (declaration_list -> declaration_list declaration .)
+    LPAREN          reduce using rule 3 (declaration_list -> declaration_list declaration .)
+    $end            reduce using rule 3 (declaration_list -> declaration_list declaration .)
+    DEDENT          reduce using rule 3 (declaration_list -> declaration_list declaration .)
+
+
+state 31
+
+    (10) var_declaration -> ID ASSIGN . expression
+    (33) assignment -> ID ASSIGN . assignment
+    (32) expression -> . assignment
+    (33) assignment -> . ID ASSIGN assignment
+    (34) assignment -> . comparison
+    (35) comparison -> . sum
+    (36) comparison -> . comparison EQ sum
+    (37) comparison -> . comparison NE sum
+    (38) comparison -> . comparison LT sum
+    (39) comparison -> . comparison GT sum
+    (40) comparison -> . comparison LE sum
+    (41) comparison -> . comparison GE sum
+    (42) sum -> . mult
+    (43) sum -> . sum PLUS mult
+    (44) sum -> . sum MINUS mult
+    (45) mult -> . unary
+    (46) mult -> . mult TIMES unary
+    (47) mult -> . mult DIVIDE unary
+    (48) mult -> . mult MOD unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    ID              shift and go to state 35
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+
+    expression                     shift and go to state 52
+    assignment                     shift and go to state 53
+    comparison                     shift and go to state 17
+    sum                            shift and go to state 18
+    mult                           shift and go to state 19
+    unary                          shift and go to state 21
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 32
+
+    (60) call -> ID LPAREN . arguments RPAREN
+    (61) call -> ID LPAREN . RPAREN
+    (62) arguments -> . expression
+    (63) arguments -> . arguments COMMA expression
+    (32) expression -> . assignment
+    (33) assignment -> . ID ASSIGN assignment
+    (34) assignment -> . comparison
+    (35) comparison -> . sum
+    (36) comparison -> . comparison EQ sum
+    (37) comparison -> . comparison NE sum
+    (38) comparison -> . comparison LT sum
+    (39) comparison -> . comparison GT sum
+    (40) comparison -> . comparison LE sum
+    (41) comparison -> . comparison GE sum
+    (42) sum -> . mult
+    (43) sum -> . sum PLUS mult
+    (44) sum -> . sum MINUS mult
+    (45) mult -> . unary
+    (46) mult -> . mult TIMES unary
+    (47) mult -> . mult DIVIDE unary
+    (48) mult -> . mult MOD unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    RPAREN          shift and go to state 55
+    ID              shift and go to state 35
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+
+    arguments                      shift and go to state 54
+    expression                     shift and go to state 56
+    assignment                     shift and go to state 16
+    comparison                     shift and go to state 17
+    sum                            shift and go to state 18
+    mult                           shift and go to state 19
+    unary                          shift and go to state 21
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 33
+
+    (11) fun_declaration -> DEF ID . LPAREN parameters RPAREN return_type COLON block
+
+    LPAREN          shift and go to state 57
+
+
+state 34
+
+    (57) primary -> LPAREN expression . RPAREN
+
+    RPAREN          shift and go to state 58
+
+
+state 35
+
+    (33) assignment -> ID . ASSIGN assignment
+    (58) primary -> ID .
+    (60) call -> ID . LPAREN arguments RPAREN
+    (61) call -> ID . LPAREN RPAREN
+
+  ! shift/reduce conflict for LPAREN resolved as shift
+    ASSIGN          shift and go to state 59
+    TIMES           reduce using rule 58 (primary -> ID .)
+    DIVIDE          reduce using rule 58 (primary -> ID .)
+    MOD             reduce using rule 58 (primary -> ID .)
+    PLUS            reduce using rule 58 (primary -> ID .)
+    MINUS           reduce using rule 58 (primary -> ID .)
+    EQ              reduce using rule 58 (primary -> ID .)
+    NE              reduce using rule 58 (primary -> ID .)
+    LT              reduce using rule 58 (primary -> ID .)
+    GT              reduce using rule 58 (primary -> ID .)
+    LE              reduce using rule 58 (primary -> ID .)
+    GE              reduce using rule 58 (primary -> ID .)
+    RPAREN          reduce using rule 58 (primary -> ID .)
+    COLON           reduce using rule 58 (primary -> ID .)
+    NEWLINE         reduce using rule 58 (primary -> ID .)
+    ID              reduce using rule 58 (primary -> ID .)
+    DEF             reduce using rule 58 (primary -> ID .)
+    IF              reduce using rule 58 (primary -> ID .)
+    RETURN          reduce using rule 58 (primary -> ID .)
+    NOT             reduce using rule 58 (primary -> ID .)
+    NUMBER          reduce using rule 58 (primary -> ID .)
+    STRING          reduce using rule 58 (primary -> ID .)
+    TRUE            reduce using rule 58 (primary -> ID .)
+    FALSE           reduce using rule 58 (primary -> ID .)
+    NONE            reduce using rule 58 (primary -> ID .)
+    $end            reduce using rule 58 (primary -> ID .)
+    DEDENT          reduce using rule 58 (primary -> ID .)
+    COMMA           reduce using rule 58 (primary -> ID .)
+    LPAREN          shift and go to state 32
+
+  ! LPAREN          [ reduce using rule 58 (primary -> ID .) ]
+
+
+state 36
+
+    (26) if_statement -> IF expression . COLON block
+    (27) if_statement -> IF expression . COLON block ELSE COLON block
+
+    COLON           shift and go to state 60
+
+
+state 37
+
+    (28) return_statement -> RETURN expression .
+
+    NEWLINE         reduce using rule 28 (return_statement -> RETURN expression .)
+    ID              reduce using rule 28 (return_statement -> RETURN expression .)
+    DEF             reduce using rule 28 (return_statement -> RETURN expression .)
+    IF              reduce using rule 28 (return_statement -> RETURN expression .)
+    RETURN          reduce using rule 28 (return_statement -> RETURN expression .)
+    MINUS           reduce using rule 28 (return_statement -> RETURN expression .)
+    NOT             reduce using rule 28 (return_statement -> RETURN expression .)
+    NUMBER          reduce using rule 28 (return_statement -> RETURN expression .)
+    STRING          reduce using rule 28 (return_statement -> RETURN expression .)
+    TRUE            reduce using rule 28 (return_statement -> RETURN expression .)
+    FALSE           reduce using rule 28 (return_statement -> RETURN expression .)
+    NONE            reduce using rule 28 (return_statement -> RETURN expression .)
+    LPAREN          reduce using rule 28 (return_statement -> RETURN expression .)
+    $end            reduce using rule 28 (return_statement -> RETURN expression .)
+    DEDENT          reduce using rule 28 (return_statement -> RETURN expression .)
+
+
+state 38
+
+    (36) comparison -> comparison EQ . sum
+    (42) sum -> . mult
+    (43) sum -> . sum PLUS mult
+    (44) sum -> . sum MINUS mult
+    (45) mult -> . unary
+    (46) mult -> . mult TIMES unary
+    (47) mult -> . mult DIVIDE unary
+    (48) mult -> . mult MOD unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+    ID              shift and go to state 50
+
+    sum                            shift and go to state 61
+    mult                           shift and go to state 19
+    unary                          shift and go to state 21
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 39
+
+    (37) comparison -> comparison NE . sum
+    (42) sum -> . mult
+    (43) sum -> . sum PLUS mult
+    (44) sum -> . sum MINUS mult
+    (45) mult -> . unary
+    (46) mult -> . mult TIMES unary
+    (47) mult -> . mult DIVIDE unary
+    (48) mult -> . mult MOD unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+    ID              shift and go to state 50
+
+    sum                            shift and go to state 62
+    mult                           shift and go to state 19
+    unary                          shift and go to state 21
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 40
+
+    (38) comparison -> comparison LT . sum
+    (42) sum -> . mult
+    (43) sum -> . sum PLUS mult
+    (44) sum -> . sum MINUS mult
+    (45) mult -> . unary
+    (46) mult -> . mult TIMES unary
+    (47) mult -> . mult DIVIDE unary
+    (48) mult -> . mult MOD unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+    ID              shift and go to state 50
+
+    sum                            shift and go to state 63
+    mult                           shift and go to state 19
+    unary                          shift and go to state 21
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 41
+
+    (39) comparison -> comparison GT . sum
+    (42) sum -> . mult
+    (43) sum -> . sum PLUS mult
+    (44) sum -> . sum MINUS mult
+    (45) mult -> . unary
+    (46) mult -> . mult TIMES unary
+    (47) mult -> . mult DIVIDE unary
+    (48) mult -> . mult MOD unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+    ID              shift and go to state 50
+
+    sum                            shift and go to state 64
+    mult                           shift and go to state 19
+    unary                          shift and go to state 21
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 42
+
+    (40) comparison -> comparison LE . sum
+    (42) sum -> . mult
+    (43) sum -> . sum PLUS mult
+    (44) sum -> . sum MINUS mult
+    (45) mult -> . unary
+    (46) mult -> . mult TIMES unary
+    (47) mult -> . mult DIVIDE unary
+    (48) mult -> . mult MOD unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+    ID              shift and go to state 50
+
+    sum                            shift and go to state 65
+    mult                           shift and go to state 19
+    unary                          shift and go to state 21
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 43
+
+    (41) comparison -> comparison GE . sum
+    (42) sum -> . mult
+    (43) sum -> . sum PLUS mult
+    (44) sum -> . sum MINUS mult
+    (45) mult -> . unary
+    (46) mult -> . mult TIMES unary
+    (47) mult -> . mult DIVIDE unary
+    (48) mult -> . mult MOD unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+    ID              shift and go to state 50
+
+    sum                            shift and go to state 66
+    mult                           shift and go to state 19
+    unary                          shift and go to state 21
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 44
+
+    (43) sum -> sum PLUS . mult
+    (45) mult -> . unary
+    (46) mult -> . mult TIMES unary
+    (47) mult -> . mult DIVIDE unary
+    (48) mult -> . mult MOD unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+    ID              shift and go to state 50
+
+    mult                           shift and go to state 67
+    unary                          shift and go to state 21
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 45
+
+    (44) sum -> sum MINUS . mult
+    (45) mult -> . unary
+    (46) mult -> . mult TIMES unary
+    (47) mult -> . mult DIVIDE unary
+    (48) mult -> . mult MOD unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+    ID              shift and go to state 50
+
+    mult                           shift and go to state 68
+    unary                          shift and go to state 21
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 46
+
+    (46) mult -> mult TIMES . unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+    ID              shift and go to state 50
+
+    unary                          shift and go to state 69
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 47
+
+    (47) mult -> mult DIVIDE . unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+    ID              shift and go to state 50
+
+    unary                          shift and go to state 70
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 48
+
+    (48) mult -> mult MOD . unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+    ID              shift and go to state 50
+
+    unary                          shift and go to state 71
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 49
+
+    (50) unary -> MINUS unary .
+
+    TIMES           reduce using rule 50 (unary -> MINUS unary .)
+    DIVIDE          reduce using rule 50 (unary -> MINUS unary .)
+    MOD             reduce using rule 50 (unary -> MINUS unary .)
+    PLUS            reduce using rule 50 (unary -> MINUS unary .)
+    MINUS           reduce using rule 50 (unary -> MINUS unary .)
+    EQ              reduce using rule 50 (unary -> MINUS unary .)
+    NE              reduce using rule 50 (unary -> MINUS unary .)
+    LT              reduce using rule 50 (unary -> MINUS unary .)
+    GT              reduce using rule 50 (unary -> MINUS unary .)
+    LE              reduce using rule 50 (unary -> MINUS unary .)
+    GE              reduce using rule 50 (unary -> MINUS unary .)
+    NEWLINE         reduce using rule 50 (unary -> MINUS unary .)
+    ID              reduce using rule 50 (unary -> MINUS unary .)
+    DEF             reduce using rule 50 (unary -> MINUS unary .)
+    IF              reduce using rule 50 (unary -> MINUS unary .)
+    RETURN          reduce using rule 50 (unary -> MINUS unary .)
+    NOT             reduce using rule 50 (unary -> MINUS unary .)
+    NUMBER          reduce using rule 50 (unary -> MINUS unary .)
+    STRING          reduce using rule 50 (unary -> MINUS unary .)
+    TRUE            reduce using rule 50 (unary -> MINUS unary .)
+    FALSE           reduce using rule 50 (unary -> MINUS unary .)
+    NONE            reduce using rule 50 (unary -> MINUS unary .)
+    LPAREN          reduce using rule 50 (unary -> MINUS unary .)
+    $end            reduce using rule 50 (unary -> MINUS unary .)
+    RPAREN          reduce using rule 50 (unary -> MINUS unary .)
+    COLON           reduce using rule 50 (unary -> MINUS unary .)
+    DEDENT          reduce using rule 50 (unary -> MINUS unary .)
+    COMMA           reduce using rule 50 (unary -> MINUS unary .)
+
+
+state 50
+
+    (58) primary -> ID .
+    (60) call -> ID . LPAREN arguments RPAREN
+    (61) call -> ID . LPAREN RPAREN
+
+  ! shift/reduce conflict for LPAREN resolved as shift
+    TIMES           reduce using rule 58 (primary -> ID .)
+    DIVIDE          reduce using rule 58 (primary -> ID .)
+    MOD             reduce using rule 58 (primary -> ID .)
+    PLUS            reduce using rule 58 (primary -> ID .)
+    MINUS           reduce using rule 58 (primary -> ID .)
+    EQ              reduce using rule 58 (primary -> ID .)
+    NE              reduce using rule 58 (primary -> ID .)
+    LT              reduce using rule 58 (primary -> ID .)
+    GT              reduce using rule 58 (primary -> ID .)
+    LE              reduce using rule 58 (primary -> ID .)
+    GE              reduce using rule 58 (primary -> ID .)
+    NEWLINE         reduce using rule 58 (primary -> ID .)
+    ID              reduce using rule 58 (primary -> ID .)
+    DEF             reduce using rule 58 (primary -> ID .)
+    IF              reduce using rule 58 (primary -> ID .)
+    RETURN          reduce using rule 58 (primary -> ID .)
+    NOT             reduce using rule 58 (primary -> ID .)
+    NUMBER          reduce using rule 58 (primary -> ID .)
+    STRING          reduce using rule 58 (primary -> ID .)
+    TRUE            reduce using rule 58 (primary -> ID .)
+    FALSE           reduce using rule 58 (primary -> ID .)
+    NONE            reduce using rule 58 (primary -> ID .)
+    $end            reduce using rule 58 (primary -> ID .)
+    RPAREN          reduce using rule 58 (primary -> ID .)
+    COLON           reduce using rule 58 (primary -> ID .)
+    DEDENT          reduce using rule 58 (primary -> ID .)
+    COMMA           reduce using rule 58 (primary -> ID .)
+    LPAREN          shift and go to state 32
+
+  ! LPAREN          [ reduce using rule 58 (primary -> ID .) ]
+
+
+state 51
+
+    (51) unary -> NOT unary .
+
+    TIMES           reduce using rule 51 (unary -> NOT unary .)
+    DIVIDE          reduce using rule 51 (unary -> NOT unary .)
+    MOD             reduce using rule 51 (unary -> NOT unary .)
+    PLUS            reduce using rule 51 (unary -> NOT unary .)
+    MINUS           reduce using rule 51 (unary -> NOT unary .)
+    EQ              reduce using rule 51 (unary -> NOT unary .)
+    NE              reduce using rule 51 (unary -> NOT unary .)
+    LT              reduce using rule 51 (unary -> NOT unary .)
+    GT              reduce using rule 51 (unary -> NOT unary .)
+    LE              reduce using rule 51 (unary -> NOT unary .)
+    GE              reduce using rule 51 (unary -> NOT unary .)
+    NEWLINE         reduce using rule 51 (unary -> NOT unary .)
+    ID              reduce using rule 51 (unary -> NOT unary .)
+    DEF             reduce using rule 51 (unary -> NOT unary .)
+    IF              reduce using rule 51 (unary -> NOT unary .)
+    RETURN          reduce using rule 51 (unary -> NOT unary .)
+    NOT             reduce using rule 51 (unary -> NOT unary .)
+    NUMBER          reduce using rule 51 (unary -> NOT unary .)
+    STRING          reduce using rule 51 (unary -> NOT unary .)
+    TRUE            reduce using rule 51 (unary -> NOT unary .)
+    FALSE           reduce using rule 51 (unary -> NOT unary .)
+    NONE            reduce using rule 51 (unary -> NOT unary .)
+    LPAREN          reduce using rule 51 (unary -> NOT unary .)
+    $end            reduce using rule 51 (unary -> NOT unary .)
+    RPAREN          reduce using rule 51 (unary -> NOT unary .)
+    COLON           reduce using rule 51 (unary -> NOT unary .)
+    DEDENT          reduce using rule 51 (unary -> NOT unary .)
+    COMMA           reduce using rule 51 (unary -> NOT unary .)
+
+
+state 52
+
+    (10) var_declaration -> ID ASSIGN expression .
+
+    NEWLINE         reduce using rule 10 (var_declaration -> ID ASSIGN expression .)
+    ID              reduce using rule 10 (var_declaration -> ID ASSIGN expression .)
+    DEF             reduce using rule 10 (var_declaration -> ID ASSIGN expression .)
+    IF              reduce using rule 10 (var_declaration -> ID ASSIGN expression .)
+    RETURN          reduce using rule 10 (var_declaration -> ID ASSIGN expression .)
+    MINUS           reduce using rule 10 (var_declaration -> ID ASSIGN expression .)
+    NOT             reduce using rule 10 (var_declaration -> ID ASSIGN expression .)
+    NUMBER          reduce using rule 10 (var_declaration -> ID ASSIGN expression .)
+    STRING          reduce using rule 10 (var_declaration -> ID ASSIGN expression .)
+    TRUE            reduce using rule 10 (var_declaration -> ID ASSIGN expression .)
+    FALSE           reduce using rule 10 (var_declaration -> ID ASSIGN expression .)
+    NONE            reduce using rule 10 (var_declaration -> ID ASSIGN expression .)
+    LPAREN          reduce using rule 10 (var_declaration -> ID ASSIGN expression .)
+    $end            reduce using rule 10 (var_declaration -> ID ASSIGN expression .)
+    DEDENT          reduce using rule 10 (var_declaration -> ID ASSIGN expression .)
+
+
+state 53
+
+    (33) assignment -> ID ASSIGN assignment .
+    (32) expression -> assignment .
+
+  ! reduce/reduce conflict for NEWLINE resolved using rule 32 (expression -> assignment .)
+  ! reduce/reduce conflict for ID resolved using rule 32 (expression -> assignment .)
+  ! reduce/reduce conflict for DEF resolved using rule 32 (expression -> assignment .)
+  ! reduce/reduce conflict for IF resolved using rule 32 (expression -> assignment .)
+  ! reduce/reduce conflict for RETURN resolved using rule 32 (expression -> assignment .)
+  ! reduce/reduce conflict for MINUS resolved using rule 32 (expression -> assignment .)
+  ! reduce/reduce conflict for NOT resolved using rule 32 (expression -> assignment .)
+  ! reduce/reduce conflict for NUMBER resolved using rule 32 (expression -> assignment .)
+  ! reduce/reduce conflict for STRING resolved using rule 32 (expression -> assignment .)
+  ! reduce/reduce conflict for TRUE resolved using rule 32 (expression -> assignment .)
+  ! reduce/reduce conflict for FALSE resolved using rule 32 (expression -> assignment .)
+  ! reduce/reduce conflict for NONE resolved using rule 32 (expression -> assignment .)
+  ! reduce/reduce conflict for LPAREN resolved using rule 32 (expression -> assignment .)
+  ! reduce/reduce conflict for $end resolved using rule 32 (expression -> assignment .)
+  ! reduce/reduce conflict for DEDENT resolved using rule 32 (expression -> assignment .)
+    NEWLINE         reduce using rule 32 (expression -> assignment .)
+    ID              reduce using rule 32 (expression -> assignment .)
+    DEF             reduce using rule 32 (expression -> assignment .)
+    IF              reduce using rule 32 (expression -> assignment .)
+    RETURN          reduce using rule 32 (expression -> assignment .)
+    MINUS           reduce using rule 32 (expression -> assignment .)
+    NOT             reduce using rule 32 (expression -> assignment .)
+    NUMBER          reduce using rule 32 (expression -> assignment .)
+    STRING          reduce using rule 32 (expression -> assignment .)
+    TRUE            reduce using rule 32 (expression -> assignment .)
+    FALSE           reduce using rule 32 (expression -> assignment .)
+    NONE            reduce using rule 32 (expression -> assignment .)
+    LPAREN          reduce using rule 32 (expression -> assignment .)
+    $end            reduce using rule 32 (expression -> assignment .)
+    DEDENT          reduce using rule 32 (expression -> assignment .)
+
+  ! NEWLINE         [ reduce using rule 33 (assignment -> ID ASSIGN assignment .) ]
+  ! ID              [ reduce using rule 33 (assignment -> ID ASSIGN assignment .) ]
+  ! DEF             [ reduce using rule 33 (assignment -> ID ASSIGN assignment .) ]
+  ! IF              [ reduce using rule 33 (assignment -> ID ASSIGN assignment .) ]
+  ! RETURN          [ reduce using rule 33 (assignment -> ID ASSIGN assignment .) ]
+  ! MINUS           [ reduce using rule 33 (assignment -> ID ASSIGN assignment .) ]
+  ! NOT             [ reduce using rule 33 (assignment -> ID ASSIGN assignment .) ]
+  ! NUMBER          [ reduce using rule 33 (assignment -> ID ASSIGN assignment .) ]
+  ! STRING          [ reduce using rule 33 (assignment -> ID ASSIGN assignment .) ]
+  ! TRUE            [ reduce using rule 33 (assignment -> ID ASSIGN assignment .) ]
+  ! FALSE           [ reduce using rule 33 (assignment -> ID ASSIGN assignment .) ]
+  ! NONE            [ reduce using rule 33 (assignment -> ID ASSIGN assignment .) ]
+  ! LPAREN          [ reduce using rule 33 (assignment -> ID ASSIGN assignment .) ]
+  ! $end            [ reduce using rule 33 (assignment -> ID ASSIGN assignment .) ]
+  ! DEDENT          [ reduce using rule 33 (assignment -> ID ASSIGN assignment .) ]
+
+
+state 54
+
+    (60) call -> ID LPAREN arguments . RPAREN
+    (63) arguments -> arguments . COMMA expression
+
+    RPAREN          shift and go to state 72
+    COMMA           shift and go to state 73
+
+
+state 55
+
+    (61) call -> ID LPAREN RPAREN .
+
+    TIMES           reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    DIVIDE          reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    MOD             reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    PLUS            reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    MINUS           reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    EQ              reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    NE              reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    LT              reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    GT              reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    LE              reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    GE              reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    NEWLINE         reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    ID              reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    DEF             reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    IF              reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    RETURN          reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    NOT             reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    NUMBER          reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    STRING          reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    TRUE            reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    FALSE           reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    NONE            reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    LPAREN          reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    $end            reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    RPAREN          reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    COLON           reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    DEDENT          reduce using rule 61 (call -> ID LPAREN RPAREN .)
+    COMMA           reduce using rule 61 (call -> ID LPAREN RPAREN .)
+
+
+state 56
+
+    (62) arguments -> expression .
+
+    RPAREN          reduce using rule 62 (arguments -> expression .)
+    COMMA           reduce using rule 62 (arguments -> expression .)
+
+
+state 57
+
+    (11) fun_declaration -> DEF ID LPAREN . parameters RPAREN return_type COLON block
+    (12) parameters -> . parameter_list
+    (13) parameters -> . empty
+    (14) parameter_list -> . parameter
+    (15) parameter_list -> . parameter_list COMMA parameter
+    (64) empty -> .
+    (16) parameter -> . ID
+    (17) parameter -> . ID COLON type
+
+    RPAREN          reduce using rule 64 (empty -> .)
+    ID              shift and go to state 74
+
+    parameters                     shift and go to state 75
+    parameter_list                 shift and go to state 76
+    empty                          shift and go to state 77
+    parameter                      shift and go to state 78
+
+state 58
+
+    (57) primary -> LPAREN expression RPAREN .
+
+    TIMES           reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    DIVIDE          reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    MOD             reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    PLUS            reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    MINUS           reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    EQ              reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    NE              reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    LT              reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    GT              reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    LE              reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    GE              reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    NEWLINE         reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    ID              reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    DEF             reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    IF              reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    RETURN          reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    NOT             reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    NUMBER          reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    STRING          reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    TRUE            reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    FALSE           reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    NONE            reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    LPAREN          reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    $end            reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    RPAREN          reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    COLON           reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    DEDENT          reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+    COMMA           reduce using rule 57 (primary -> LPAREN expression RPAREN .)
+
+
+state 59
+
+    (33) assignment -> ID ASSIGN . assignment
+    (33) assignment -> . ID ASSIGN assignment
+    (34) assignment -> . comparison
+    (35) comparison -> . sum
+    (36) comparison -> . comparison EQ sum
+    (37) comparison -> . comparison NE sum
+    (38) comparison -> . comparison LT sum
+    (39) comparison -> . comparison GT sum
+    (40) comparison -> . comparison LE sum
+    (41) comparison -> . comparison GE sum
+    (42) sum -> . mult
+    (43) sum -> . sum PLUS mult
+    (44) sum -> . sum MINUS mult
+    (45) mult -> . unary
+    (46) mult -> . mult TIMES unary
+    (47) mult -> . mult DIVIDE unary
+    (48) mult -> . mult MOD unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    ID              shift and go to state 35
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+
+    assignment                     shift and go to state 79
+    comparison                     shift and go to state 17
+    sum                            shift and go to state 18
+    mult                           shift and go to state 19
+    unary                          shift and go to state 21
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 60
+
+    (26) if_statement -> IF expression COLON . block
+    (27) if_statement -> IF expression COLON . block ELSE COLON block
+    (31) block -> . INDENT declaration_list DEDENT
+
+    INDENT          shift and go to state 81
+
+    block                          shift and go to state 80
+
+state 61
+
+    (36) comparison -> comparison EQ sum .
+    (43) sum -> sum . PLUS mult
+    (44) sum -> sum . MINUS mult
+
+    EQ              reduce using rule 36 (comparison -> comparison EQ sum .)
+    NE              reduce using rule 36 (comparison -> comparison EQ sum .)
+    LT              reduce using rule 36 (comparison -> comparison EQ sum .)
+    GT              reduce using rule 36 (comparison -> comparison EQ sum .)
+    LE              reduce using rule 36 (comparison -> comparison EQ sum .)
+    GE              reduce using rule 36 (comparison -> comparison EQ sum .)
+    NEWLINE         reduce using rule 36 (comparison -> comparison EQ sum .)
+    ID              reduce using rule 36 (comparison -> comparison EQ sum .)
+    DEF             reduce using rule 36 (comparison -> comparison EQ sum .)
+    IF              reduce using rule 36 (comparison -> comparison EQ sum .)
+    RETURN          reduce using rule 36 (comparison -> comparison EQ sum .)
+    NOT             reduce using rule 36 (comparison -> comparison EQ sum .)
+    NUMBER          reduce using rule 36 (comparison -> comparison EQ sum .)
+    STRING          reduce using rule 36 (comparison -> comparison EQ sum .)
+    TRUE            reduce using rule 36 (comparison -> comparison EQ sum .)
+    FALSE           reduce using rule 36 (comparison -> comparison EQ sum .)
+    NONE            reduce using rule 36 (comparison -> comparison EQ sum .)
+    LPAREN          reduce using rule 36 (comparison -> comparison EQ sum .)
+    $end            reduce using rule 36 (comparison -> comparison EQ sum .)
+    RPAREN          reduce using rule 36 (comparison -> comparison EQ sum .)
+    COLON           reduce using rule 36 (comparison -> comparison EQ sum .)
+    DEDENT          reduce using rule 36 (comparison -> comparison EQ sum .)
+    COMMA           reduce using rule 36 (comparison -> comparison EQ sum .)
+    PLUS            shift and go to state 44
+    MINUS           shift and go to state 45
+
+  ! MINUS           [ reduce using rule 36 (comparison -> comparison EQ sum .) ]
+
+
+state 62
+
+    (37) comparison -> comparison NE sum .
+    (43) sum -> sum . PLUS mult
+    (44) sum -> sum . MINUS mult
+
+    EQ              reduce using rule 37 (comparison -> comparison NE sum .)
+    NE              reduce using rule 37 (comparison -> comparison NE sum .)
+    LT              reduce using rule 37 (comparison -> comparison NE sum .)
+    GT              reduce using rule 37 (comparison -> comparison NE sum .)
+    LE              reduce using rule 37 (comparison -> comparison NE sum .)
+    GE              reduce using rule 37 (comparison -> comparison NE sum .)
+    NEWLINE         reduce using rule 37 (comparison -> comparison NE sum .)
+    ID              reduce using rule 37 (comparison -> comparison NE sum .)
+    DEF             reduce using rule 37 (comparison -> comparison NE sum .)
+    IF              reduce using rule 37 (comparison -> comparison NE sum .)
+    RETURN          reduce using rule 37 (comparison -> comparison NE sum .)
+    NOT             reduce using rule 37 (comparison -> comparison NE sum .)
+    NUMBER          reduce using rule 37 (comparison -> comparison NE sum .)
+    STRING          reduce using rule 37 (comparison -> comparison NE sum .)
+    TRUE            reduce using rule 37 (comparison -> comparison NE sum .)
+    FALSE           reduce using rule 37 (comparison -> comparison NE sum .)
+    NONE            reduce using rule 37 (comparison -> comparison NE sum .)
+    LPAREN          reduce using rule 37 (comparison -> comparison NE sum .)
+    $end            reduce using rule 37 (comparison -> comparison NE sum .)
+    RPAREN          reduce using rule 37 (comparison -> comparison NE sum .)
+    COLON           reduce using rule 37 (comparison -> comparison NE sum .)
+    DEDENT          reduce using rule 37 (comparison -> comparison NE sum .)
+    COMMA           reduce using rule 37 (comparison -> comparison NE sum .)
+    PLUS            shift and go to state 44
+    MINUS           shift and go to state 45
+
+  ! MINUS           [ reduce using rule 37 (comparison -> comparison NE sum .) ]
+
+
+state 63
+
+    (38) comparison -> comparison LT sum .
+    (43) sum -> sum . PLUS mult
+    (44) sum -> sum . MINUS mult
+
+    EQ              reduce using rule 38 (comparison -> comparison LT sum .)
+    NE              reduce using rule 38 (comparison -> comparison LT sum .)
+    LT              reduce using rule 38 (comparison -> comparison LT sum .)
+    GT              reduce using rule 38 (comparison -> comparison LT sum .)
+    LE              reduce using rule 38 (comparison -> comparison LT sum .)
+    GE              reduce using rule 38 (comparison -> comparison LT sum .)
+    NEWLINE         reduce using rule 38 (comparison -> comparison LT sum .)
+    ID              reduce using rule 38 (comparison -> comparison LT sum .)
+    DEF             reduce using rule 38 (comparison -> comparison LT sum .)
+    IF              reduce using rule 38 (comparison -> comparison LT sum .)
+    RETURN          reduce using rule 38 (comparison -> comparison LT sum .)
+    NOT             reduce using rule 38 (comparison -> comparison LT sum .)
+    NUMBER          reduce using rule 38 (comparison -> comparison LT sum .)
+    STRING          reduce using rule 38 (comparison -> comparison LT sum .)
+    TRUE            reduce using rule 38 (comparison -> comparison LT sum .)
+    FALSE           reduce using rule 38 (comparison -> comparison LT sum .)
+    NONE            reduce using rule 38 (comparison -> comparison LT sum .)
+    LPAREN          reduce using rule 38 (comparison -> comparison LT sum .)
+    $end            reduce using rule 38 (comparison -> comparison LT sum .)
+    RPAREN          reduce using rule 38 (comparison -> comparison LT sum .)
+    COLON           reduce using rule 38 (comparison -> comparison LT sum .)
+    DEDENT          reduce using rule 38 (comparison -> comparison LT sum .)
+    COMMA           reduce using rule 38 (comparison -> comparison LT sum .)
+    PLUS            shift and go to state 44
+    MINUS           shift and go to state 45
+
+  ! MINUS           [ reduce using rule 38 (comparison -> comparison LT sum .) ]
+
+
+state 64
+
+    (39) comparison -> comparison GT sum .
+    (43) sum -> sum . PLUS mult
+    (44) sum -> sum . MINUS mult
+
+    EQ              reduce using rule 39 (comparison -> comparison GT sum .)
+    NE              reduce using rule 39 (comparison -> comparison GT sum .)
+    LT              reduce using rule 39 (comparison -> comparison GT sum .)
+    GT              reduce using rule 39 (comparison -> comparison GT sum .)
+    LE              reduce using rule 39 (comparison -> comparison GT sum .)
+    GE              reduce using rule 39 (comparison -> comparison GT sum .)
+    NEWLINE         reduce using rule 39 (comparison -> comparison GT sum .)
+    ID              reduce using rule 39 (comparison -> comparison GT sum .)
+    DEF             reduce using rule 39 (comparison -> comparison GT sum .)
+    IF              reduce using rule 39 (comparison -> comparison GT sum .)
+    RETURN          reduce using rule 39 (comparison -> comparison GT sum .)
+    NOT             reduce using rule 39 (comparison -> comparison GT sum .)
+    NUMBER          reduce using rule 39 (comparison -> comparison GT sum .)
+    STRING          reduce using rule 39 (comparison -> comparison GT sum .)
+    TRUE            reduce using rule 39 (comparison -> comparison GT sum .)
+    FALSE           reduce using rule 39 (comparison -> comparison GT sum .)
+    NONE            reduce using rule 39 (comparison -> comparison GT sum .)
+    LPAREN          reduce using rule 39 (comparison -> comparison GT sum .)
+    $end            reduce using rule 39 (comparison -> comparison GT sum .)
+    RPAREN          reduce using rule 39 (comparison -> comparison GT sum .)
+    COLON           reduce using rule 39 (comparison -> comparison GT sum .)
+    DEDENT          reduce using rule 39 (comparison -> comparison GT sum .)
+    COMMA           reduce using rule 39 (comparison -> comparison GT sum .)
+    PLUS            shift and go to state 44
+    MINUS           shift and go to state 45
+
+  ! MINUS           [ reduce using rule 39 (comparison -> comparison GT sum .) ]
+
+
+state 65
+
+    (40) comparison -> comparison LE sum .
+    (43) sum -> sum . PLUS mult
+    (44) sum -> sum . MINUS mult
+
+    EQ              reduce using rule 40 (comparison -> comparison LE sum .)
+    NE              reduce using rule 40 (comparison -> comparison LE sum .)
+    LT              reduce using rule 40 (comparison -> comparison LE sum .)
+    GT              reduce using rule 40 (comparison -> comparison LE sum .)
+    LE              reduce using rule 40 (comparison -> comparison LE sum .)
+    GE              reduce using rule 40 (comparison -> comparison LE sum .)
+    NEWLINE         reduce using rule 40 (comparison -> comparison LE sum .)
+    ID              reduce using rule 40 (comparison -> comparison LE sum .)
+    DEF             reduce using rule 40 (comparison -> comparison LE sum .)
+    IF              reduce using rule 40 (comparison -> comparison LE sum .)
+    RETURN          reduce using rule 40 (comparison -> comparison LE sum .)
+    NOT             reduce using rule 40 (comparison -> comparison LE sum .)
+    NUMBER          reduce using rule 40 (comparison -> comparison LE sum .)
+    STRING          reduce using rule 40 (comparison -> comparison LE sum .)
+    TRUE            reduce using rule 40 (comparison -> comparison LE sum .)
+    FALSE           reduce using rule 40 (comparison -> comparison LE sum .)
+    NONE            reduce using rule 40 (comparison -> comparison LE sum .)
+    LPAREN          reduce using rule 40 (comparison -> comparison LE sum .)
+    $end            reduce using rule 40 (comparison -> comparison LE sum .)
+    RPAREN          reduce using rule 40 (comparison -> comparison LE sum .)
+    COLON           reduce using rule 40 (comparison -> comparison LE sum .)
+    DEDENT          reduce using rule 40 (comparison -> comparison LE sum .)
+    COMMA           reduce using rule 40 (comparison -> comparison LE sum .)
+    PLUS            shift and go to state 44
+    MINUS           shift and go to state 45
+
+  ! MINUS           [ reduce using rule 40 (comparison -> comparison LE sum .) ]
+
+
+state 66
+
+    (41) comparison -> comparison GE sum .
+    (43) sum -> sum . PLUS mult
+    (44) sum -> sum . MINUS mult
+
+    EQ              reduce using rule 41 (comparison -> comparison GE sum .)
+    NE              reduce using rule 41 (comparison -> comparison GE sum .)
+    LT              reduce using rule 41 (comparison -> comparison GE sum .)
+    GT              reduce using rule 41 (comparison -> comparison GE sum .)
+    LE              reduce using rule 41 (comparison -> comparison GE sum .)
+    GE              reduce using rule 41 (comparison -> comparison GE sum .)
+    NEWLINE         reduce using rule 41 (comparison -> comparison GE sum .)
+    ID              reduce using rule 41 (comparison -> comparison GE sum .)
+    DEF             reduce using rule 41 (comparison -> comparison GE sum .)
+    IF              reduce using rule 41 (comparison -> comparison GE sum .)
+    RETURN          reduce using rule 41 (comparison -> comparison GE sum .)
+    NOT             reduce using rule 41 (comparison -> comparison GE sum .)
+    NUMBER          reduce using rule 41 (comparison -> comparison GE sum .)
+    STRING          reduce using rule 41 (comparison -> comparison GE sum .)
+    TRUE            reduce using rule 41 (comparison -> comparison GE sum .)
+    FALSE           reduce using rule 41 (comparison -> comparison GE sum .)
+    NONE            reduce using rule 41 (comparison -> comparison GE sum .)
+    LPAREN          reduce using rule 41 (comparison -> comparison GE sum .)
+    $end            reduce using rule 41 (comparison -> comparison GE sum .)
+    RPAREN          reduce using rule 41 (comparison -> comparison GE sum .)
+    COLON           reduce using rule 41 (comparison -> comparison GE sum .)
+    DEDENT          reduce using rule 41 (comparison -> comparison GE sum .)
+    COMMA           reduce using rule 41 (comparison -> comparison GE sum .)
+    PLUS            shift and go to state 44
+    MINUS           shift and go to state 45
+
+  ! MINUS           [ reduce using rule 41 (comparison -> comparison GE sum .) ]
+
+
+state 67
+
+    (43) sum -> sum PLUS mult .
+    (46) mult -> mult . TIMES unary
+    (47) mult -> mult . DIVIDE unary
+    (48) mult -> mult . MOD unary
+
+    PLUS            reduce using rule 43 (sum -> sum PLUS mult .)
+    MINUS           reduce using rule 43 (sum -> sum PLUS mult .)
+    EQ              reduce using rule 43 (sum -> sum PLUS mult .)
+    NE              reduce using rule 43 (sum -> sum PLUS mult .)
+    LT              reduce using rule 43 (sum -> sum PLUS mult .)
+    GT              reduce using rule 43 (sum -> sum PLUS mult .)
+    LE              reduce using rule 43 (sum -> sum PLUS mult .)
+    GE              reduce using rule 43 (sum -> sum PLUS mult .)
+    NEWLINE         reduce using rule 43 (sum -> sum PLUS mult .)
+    ID              reduce using rule 43 (sum -> sum PLUS mult .)
+    DEF             reduce using rule 43 (sum -> sum PLUS mult .)
+    IF              reduce using rule 43 (sum -> sum PLUS mult .)
+    RETURN          reduce using rule 43 (sum -> sum PLUS mult .)
+    NOT             reduce using rule 43 (sum -> sum PLUS mult .)
+    NUMBER          reduce using rule 43 (sum -> sum PLUS mult .)
+    STRING          reduce using rule 43 (sum -> sum PLUS mult .)
+    TRUE            reduce using rule 43 (sum -> sum PLUS mult .)
+    FALSE           reduce using rule 43 (sum -> sum PLUS mult .)
+    NONE            reduce using rule 43 (sum -> sum PLUS mult .)
+    LPAREN          reduce using rule 43 (sum -> sum PLUS mult .)
+    $end            reduce using rule 43 (sum -> sum PLUS mult .)
+    RPAREN          reduce using rule 43 (sum -> sum PLUS mult .)
+    COLON           reduce using rule 43 (sum -> sum PLUS mult .)
+    DEDENT          reduce using rule 43 (sum -> sum PLUS mult .)
+    COMMA           reduce using rule 43 (sum -> sum PLUS mult .)
+    TIMES           shift and go to state 46
+    DIVIDE          shift and go to state 47
+    MOD             shift and go to state 48
+
+
+state 68
+
+    (44) sum -> sum MINUS mult .
+    (46) mult -> mult . TIMES unary
+    (47) mult -> mult . DIVIDE unary
+    (48) mult -> mult . MOD unary
+
+    PLUS            reduce using rule 44 (sum -> sum MINUS mult .)
+    MINUS           reduce using rule 44 (sum -> sum MINUS mult .)
+    EQ              reduce using rule 44 (sum -> sum MINUS mult .)
+    NE              reduce using rule 44 (sum -> sum MINUS mult .)
+    LT              reduce using rule 44 (sum -> sum MINUS mult .)
+    GT              reduce using rule 44 (sum -> sum MINUS mult .)
+    LE              reduce using rule 44 (sum -> sum MINUS mult .)
+    GE              reduce using rule 44 (sum -> sum MINUS mult .)
+    NEWLINE         reduce using rule 44 (sum -> sum MINUS mult .)
+    ID              reduce using rule 44 (sum -> sum MINUS mult .)
+    DEF             reduce using rule 44 (sum -> sum MINUS mult .)
+    IF              reduce using rule 44 (sum -> sum MINUS mult .)
+    RETURN          reduce using rule 44 (sum -> sum MINUS mult .)
+    NOT             reduce using rule 44 (sum -> sum MINUS mult .)
+    NUMBER          reduce using rule 44 (sum -> sum MINUS mult .)
+    STRING          reduce using rule 44 (sum -> sum MINUS mult .)
+    TRUE            reduce using rule 44 (sum -> sum MINUS mult .)
+    FALSE           reduce using rule 44 (sum -> sum MINUS mult .)
+    NONE            reduce using rule 44 (sum -> sum MINUS mult .)
+    LPAREN          reduce using rule 44 (sum -> sum MINUS mult .)
+    $end            reduce using rule 44 (sum -> sum MINUS mult .)
+    RPAREN          reduce using rule 44 (sum -> sum MINUS mult .)
+    COLON           reduce using rule 44 (sum -> sum MINUS mult .)
+    DEDENT          reduce using rule 44 (sum -> sum MINUS mult .)
+    COMMA           reduce using rule 44 (sum -> sum MINUS mult .)
+    TIMES           shift and go to state 46
+    DIVIDE          shift and go to state 47
+    MOD             shift and go to state 48
+
+
+state 69
+
+    (46) mult -> mult TIMES unary .
+
+    TIMES           reduce using rule 46 (mult -> mult TIMES unary .)
+    DIVIDE          reduce using rule 46 (mult -> mult TIMES unary .)
+    MOD             reduce using rule 46 (mult -> mult TIMES unary .)
+    PLUS            reduce using rule 46 (mult -> mult TIMES unary .)
+    MINUS           reduce using rule 46 (mult -> mult TIMES unary .)
+    EQ              reduce using rule 46 (mult -> mult TIMES unary .)
+    NE              reduce using rule 46 (mult -> mult TIMES unary .)
+    LT              reduce using rule 46 (mult -> mult TIMES unary .)
+    GT              reduce using rule 46 (mult -> mult TIMES unary .)
+    LE              reduce using rule 46 (mult -> mult TIMES unary .)
+    GE              reduce using rule 46 (mult -> mult TIMES unary .)
+    NEWLINE         reduce using rule 46 (mult -> mult TIMES unary .)
+    ID              reduce using rule 46 (mult -> mult TIMES unary .)
+    DEF             reduce using rule 46 (mult -> mult TIMES unary .)
+    IF              reduce using rule 46 (mult -> mult TIMES unary .)
+    RETURN          reduce using rule 46 (mult -> mult TIMES unary .)
+    NOT             reduce using rule 46 (mult -> mult TIMES unary .)
+    NUMBER          reduce using rule 46 (mult -> mult TIMES unary .)
+    STRING          reduce using rule 46 (mult -> mult TIMES unary .)
+    TRUE            reduce using rule 46 (mult -> mult TIMES unary .)
+    FALSE           reduce using rule 46 (mult -> mult TIMES unary .)
+    NONE            reduce using rule 46 (mult -> mult TIMES unary .)
+    LPAREN          reduce using rule 46 (mult -> mult TIMES unary .)
+    $end            reduce using rule 46 (mult -> mult TIMES unary .)
+    RPAREN          reduce using rule 46 (mult -> mult TIMES unary .)
+    COLON           reduce using rule 46 (mult -> mult TIMES unary .)
+    DEDENT          reduce using rule 46 (mult -> mult TIMES unary .)
+    COMMA           reduce using rule 46 (mult -> mult TIMES unary .)
+
+
+state 70
+
+    (47) mult -> mult DIVIDE unary .
+
+    TIMES           reduce using rule 47 (mult -> mult DIVIDE unary .)
+    DIVIDE          reduce using rule 47 (mult -> mult DIVIDE unary .)
+    MOD             reduce using rule 47 (mult -> mult DIVIDE unary .)
+    PLUS            reduce using rule 47 (mult -> mult DIVIDE unary .)
+    MINUS           reduce using rule 47 (mult -> mult DIVIDE unary .)
+    EQ              reduce using rule 47 (mult -> mult DIVIDE unary .)
+    NE              reduce using rule 47 (mult -> mult DIVIDE unary .)
+    LT              reduce using rule 47 (mult -> mult DIVIDE unary .)
+    GT              reduce using rule 47 (mult -> mult DIVIDE unary .)
+    LE              reduce using rule 47 (mult -> mult DIVIDE unary .)
+    GE              reduce using rule 47 (mult -> mult DIVIDE unary .)
+    NEWLINE         reduce using rule 47 (mult -> mult DIVIDE unary .)
+    ID              reduce using rule 47 (mult -> mult DIVIDE unary .)
+    DEF             reduce using rule 47 (mult -> mult DIVIDE unary .)
+    IF              reduce using rule 47 (mult -> mult DIVIDE unary .)
+    RETURN          reduce using rule 47 (mult -> mult DIVIDE unary .)
+    NOT             reduce using rule 47 (mult -> mult DIVIDE unary .)
+    NUMBER          reduce using rule 47 (mult -> mult DIVIDE unary .)
+    STRING          reduce using rule 47 (mult -> mult DIVIDE unary .)
+    TRUE            reduce using rule 47 (mult -> mult DIVIDE unary .)
+    FALSE           reduce using rule 47 (mult -> mult DIVIDE unary .)
+    NONE            reduce using rule 47 (mult -> mult DIVIDE unary .)
+    LPAREN          reduce using rule 47 (mult -> mult DIVIDE unary .)
+    $end            reduce using rule 47 (mult -> mult DIVIDE unary .)
+    RPAREN          reduce using rule 47 (mult -> mult DIVIDE unary .)
+    COLON           reduce using rule 47 (mult -> mult DIVIDE unary .)
+    DEDENT          reduce using rule 47 (mult -> mult DIVIDE unary .)
+    COMMA           reduce using rule 47 (mult -> mult DIVIDE unary .)
+
+
+state 71
+
+    (48) mult -> mult MOD unary .
+
+    TIMES           reduce using rule 48 (mult -> mult MOD unary .)
+    DIVIDE          reduce using rule 48 (mult -> mult MOD unary .)
+    MOD             reduce using rule 48 (mult -> mult MOD unary .)
+    PLUS            reduce using rule 48 (mult -> mult MOD unary .)
+    MINUS           reduce using rule 48 (mult -> mult MOD unary .)
+    EQ              reduce using rule 48 (mult -> mult MOD unary .)
+    NE              reduce using rule 48 (mult -> mult MOD unary .)
+    LT              reduce using rule 48 (mult -> mult MOD unary .)
+    GT              reduce using rule 48 (mult -> mult MOD unary .)
+    LE              reduce using rule 48 (mult -> mult MOD unary .)
+    GE              reduce using rule 48 (mult -> mult MOD unary .)
+    NEWLINE         reduce using rule 48 (mult -> mult MOD unary .)
+    ID              reduce using rule 48 (mult -> mult MOD unary .)
+    DEF             reduce using rule 48 (mult -> mult MOD unary .)
+    IF              reduce using rule 48 (mult -> mult MOD unary .)
+    RETURN          reduce using rule 48 (mult -> mult MOD unary .)
+    NOT             reduce using rule 48 (mult -> mult MOD unary .)
+    NUMBER          reduce using rule 48 (mult -> mult MOD unary .)
+    STRING          reduce using rule 48 (mult -> mult MOD unary .)
+    TRUE            reduce using rule 48 (mult -> mult MOD unary .)
+    FALSE           reduce using rule 48 (mult -> mult MOD unary .)
+    NONE            reduce using rule 48 (mult -> mult MOD unary .)
+    LPAREN          reduce using rule 48 (mult -> mult MOD unary .)
+    $end            reduce using rule 48 (mult -> mult MOD unary .)
+    RPAREN          reduce using rule 48 (mult -> mult MOD unary .)
+    COLON           reduce using rule 48 (mult -> mult MOD unary .)
+    DEDENT          reduce using rule 48 (mult -> mult MOD unary .)
+    COMMA           reduce using rule 48 (mult -> mult MOD unary .)
+
+
+state 72
+
+    (60) call -> ID LPAREN arguments RPAREN .
+
+    TIMES           reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    DIVIDE          reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    MOD             reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    PLUS            reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    MINUS           reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    EQ              reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    NE              reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    LT              reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    GT              reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    LE              reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    GE              reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    NEWLINE         reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    ID              reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    DEF             reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    IF              reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    RETURN          reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    NOT             reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    NUMBER          reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    STRING          reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    TRUE            reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    FALSE           reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    NONE            reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    LPAREN          reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    $end            reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    RPAREN          reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    COLON           reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    DEDENT          reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+    COMMA           reduce using rule 60 (call -> ID LPAREN arguments RPAREN .)
+
+
+state 73
+
+    (63) arguments -> arguments COMMA . expression
+    (32) expression -> . assignment
+    (33) assignment -> . ID ASSIGN assignment
+    (34) assignment -> . comparison
+    (35) comparison -> . sum
+    (36) comparison -> . comparison EQ sum
+    (37) comparison -> . comparison NE sum
+    (38) comparison -> . comparison LT sum
+    (39) comparison -> . comparison GT sum
+    (40) comparison -> . comparison LE sum
+    (41) comparison -> . comparison GE sum
+    (42) sum -> . mult
+    (43) sum -> . sum PLUS mult
+    (44) sum -> . sum MINUS mult
+    (45) mult -> . unary
+    (46) mult -> . mult TIMES unary
+    (47) mult -> . mult DIVIDE unary
+    (48) mult -> . mult MOD unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    ID              shift and go to state 35
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+
+    expression                     shift and go to state 82
+    assignment                     shift and go to state 16
+    comparison                     shift and go to state 17
+    sum                            shift and go to state 18
+    mult                           shift and go to state 19
+    unary                          shift and go to state 21
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 74
+
+    (16) parameter -> ID .
+    (17) parameter -> ID . COLON type
+
+    COMMA           reduce using rule 16 (parameter -> ID .)
+    RPAREN          reduce using rule 16 (parameter -> ID .)
+    COLON           shift and go to state 83
+
+
+state 75
+
+    (11) fun_declaration -> DEF ID LPAREN parameters . RPAREN return_type COLON block
+
+    RPAREN          shift and go to state 84
+
+
+state 76
+
+    (12) parameters -> parameter_list .
+    (15) parameter_list -> parameter_list . COMMA parameter
+
+    RPAREN          reduce using rule 12 (parameters -> parameter_list .)
+    COMMA           shift and go to state 85
+
+
+state 77
+
+    (13) parameters -> empty .
+
+    RPAREN          reduce using rule 13 (parameters -> empty .)
+
+
+state 78
+
+    (14) parameter_list -> parameter .
+
+    COMMA           reduce using rule 14 (parameter_list -> parameter .)
+    RPAREN          reduce using rule 14 (parameter_list -> parameter .)
+
+
+state 79
+
+    (33) assignment -> ID ASSIGN assignment .
+
+    RPAREN          reduce using rule 33 (assignment -> ID ASSIGN assignment .)
+    COLON           reduce using rule 33 (assignment -> ID ASSIGN assignment .)
+    NEWLINE         reduce using rule 33 (assignment -> ID ASSIGN assignment .)
+    ID              reduce using rule 33 (assignment -> ID ASSIGN assignment .)
+    DEF             reduce using rule 33 (assignment -> ID ASSIGN assignment .)
+    IF              reduce using rule 33 (assignment -> ID ASSIGN assignment .)
+    RETURN          reduce using rule 33 (assignment -> ID ASSIGN assignment .)
+    MINUS           reduce using rule 33 (assignment -> ID ASSIGN assignment .)
+    NOT             reduce using rule 33 (assignment -> ID ASSIGN assignment .)
+    NUMBER          reduce using rule 33 (assignment -> ID ASSIGN assignment .)
+    STRING          reduce using rule 33 (assignment -> ID ASSIGN assignment .)
+    TRUE            reduce using rule 33 (assignment -> ID ASSIGN assignment .)
+    FALSE           reduce using rule 33 (assignment -> ID ASSIGN assignment .)
+    NONE            reduce using rule 33 (assignment -> ID ASSIGN assignment .)
+    LPAREN          reduce using rule 33 (assignment -> ID ASSIGN assignment .)
+    $end            reduce using rule 33 (assignment -> ID ASSIGN assignment .)
+    DEDENT          reduce using rule 33 (assignment -> ID ASSIGN assignment .)
+    COMMA           reduce using rule 33 (assignment -> ID ASSIGN assignment .)
+
+
+state 80
+
+    (26) if_statement -> IF expression COLON block .
+    (27) if_statement -> IF expression COLON block . ELSE COLON block
+
+    NEWLINE         reduce using rule 26 (if_statement -> IF expression COLON block .)
+    ID              reduce using rule 26 (if_statement -> IF expression COLON block .)
+    DEF             reduce using rule 26 (if_statement -> IF expression COLON block .)
+    IF              reduce using rule 26 (if_statement -> IF expression COLON block .)
+    RETURN          reduce using rule 26 (if_statement -> IF expression COLON block .)
+    MINUS           reduce using rule 26 (if_statement -> IF expression COLON block .)
+    NOT             reduce using rule 26 (if_statement -> IF expression COLON block .)
+    NUMBER          reduce using rule 26 (if_statement -> IF expression COLON block .)
+    STRING          reduce using rule 26 (if_statement -> IF expression COLON block .)
+    TRUE            reduce using rule 26 (if_statement -> IF expression COLON block .)
+    FALSE           reduce using rule 26 (if_statement -> IF expression COLON block .)
+    NONE            reduce using rule 26 (if_statement -> IF expression COLON block .)
+    LPAREN          reduce using rule 26 (if_statement -> IF expression COLON block .)
+    $end            reduce using rule 26 (if_statement -> IF expression COLON block .)
+    DEDENT          reduce using rule 26 (if_statement -> IF expression COLON block .)
+    ELSE            shift and go to state 86
+
+
+state 81
+
+    (31) block -> INDENT . declaration_list DEDENT
+    (2) declaration_list -> . declaration
+    (3) declaration_list -> . declaration_list declaration
+    (4) declaration -> . var_declaration
+    (5) declaration -> . fun_declaration
+    (6) declaration -> . if_statement
+    (7) declaration -> . return_statement
+    (8) declaration -> . expression_statement
+    (9) declaration -> . NEWLINE
+    (10) var_declaration -> . ID ASSIGN expression
+    (11) fun_declaration -> . DEF ID LPAREN parameters RPAREN return_type COLON block
+    (26) if_statement -> . IF expression COLON block
+    (27) if_statement -> . IF expression COLON block ELSE COLON block
+    (28) return_statement -> . RETURN expression
+    (29) return_statement -> . RETURN
+    (30) expression_statement -> . expression
+    (32) expression -> . assignment
+    (33) assignment -> . ID ASSIGN assignment
+    (34) assignment -> . comparison
+    (35) comparison -> . sum
+    (36) comparison -> . comparison EQ sum
+    (37) comparison -> . comparison NE sum
+    (38) comparison -> . comparison LT sum
+    (39) comparison -> . comparison GT sum
+    (40) comparison -> . comparison LE sum
+    (41) comparison -> . comparison GE sum
+    (42) sum -> . mult
+    (43) sum -> . sum PLUS mult
+    (44) sum -> . sum MINUS mult
+    (45) mult -> . unary
+    (46) mult -> . mult TIMES unary
+    (47) mult -> . mult DIVIDE unary
+    (48) mult -> . mult MOD unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    NEWLINE         shift and go to state 9
+    ID              shift and go to state 10
+    DEF             shift and go to state 12
+    IF              shift and go to state 14
+    RETURN          shift and go to state 15
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+
+    declaration_list               shift and go to state 87
+    declaration                    shift and go to state 3
+    var_declaration                shift and go to state 4
+    fun_declaration                shift and go to state 5
+    if_statement                   shift and go to state 6
+    return_statement               shift and go to state 7
+    expression_statement           shift and go to state 8
+    expression                     shift and go to state 11
+    assignment                     shift and go to state 16
+    comparison                     shift and go to state 17
+    sum                            shift and go to state 18
+    mult                           shift and go to state 19
+    unary                          shift and go to state 21
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 82
+
+    (63) arguments -> arguments COMMA expression .
+
+    RPAREN          reduce using rule 63 (arguments -> arguments COMMA expression .)
+    COMMA           reduce using rule 63 (arguments -> arguments COMMA expression .)
+
+
+state 83
+
+    (17) parameter -> ID COLON . type
+    (20) type -> . INT
+    (21) type -> . STR
+    (22) type -> . FLOAT
+    (23) type -> . BOOL
+    (24) type -> . LIST
+    (25) type -> . DICT
+
+    INT             shift and go to state 89
+    STR             shift and go to state 90
+    FLOAT           shift and go to state 91
+    BOOL            shift and go to state 92
+    LIST            shift and go to state 93
+    DICT            shift and go to state 94
+
+    type                           shift and go to state 88
+
+state 84
+
+    (11) fun_declaration -> DEF ID LPAREN parameters RPAREN . return_type COLON block
+    (18) return_type -> . ARROW type
+    (19) return_type -> . empty
+    (64) empty -> .
+
+    ARROW           shift and go to state 96
+    COLON           reduce using rule 64 (empty -> .)
+
+    return_type                    shift and go to state 95
+    empty                          shift and go to state 97
+
+state 85
+
+    (15) parameter_list -> parameter_list COMMA . parameter
+    (16) parameter -> . ID
+    (17) parameter -> . ID COLON type
+
+    ID              shift and go to state 74
+
+    parameter                      shift and go to state 98
+
+state 86
+
+    (27) if_statement -> IF expression COLON block ELSE . COLON block
+
+    COLON           shift and go to state 99
+
+
+state 87
+
+    (31) block -> INDENT declaration_list . DEDENT
+    (3) declaration_list -> declaration_list . declaration
+    (4) declaration -> . var_declaration
+    (5) declaration -> . fun_declaration
+    (6) declaration -> . if_statement
+    (7) declaration -> . return_statement
+    (8) declaration -> . expression_statement
+    (9) declaration -> . NEWLINE
+    (10) var_declaration -> . ID ASSIGN expression
+    (11) fun_declaration -> . DEF ID LPAREN parameters RPAREN return_type COLON block
+    (26) if_statement -> . IF expression COLON block
+    (27) if_statement -> . IF expression COLON block ELSE COLON block
+    (28) return_statement -> . RETURN expression
+    (29) return_statement -> . RETURN
+    (30) expression_statement -> . expression
+    (32) expression -> . assignment
+    (33) assignment -> . ID ASSIGN assignment
+    (34) assignment -> . comparison
+    (35) comparison -> . sum
+    (36) comparison -> . comparison EQ sum
+    (37) comparison -> . comparison NE sum
+    (38) comparison -> . comparison LT sum
+    (39) comparison -> . comparison GT sum
+    (40) comparison -> . comparison LE sum
+    (41) comparison -> . comparison GE sum
+    (42) sum -> . mult
+    (43) sum -> . sum PLUS mult
+    (44) sum -> . sum MINUS mult
+    (45) mult -> . unary
+    (46) mult -> . mult TIMES unary
+    (47) mult -> . mult DIVIDE unary
+    (48) mult -> . mult MOD unary
+    (49) unary -> . primary
+    (50) unary -> . MINUS unary
+    (51) unary -> . NOT unary
+    (52) primary -> . NUMBER
+    (53) primary -> . STRING
+    (54) primary -> . TRUE
+    (55) primary -> . FALSE
+    (56) primary -> . NONE
+    (57) primary -> . LPAREN expression RPAREN
+    (58) primary -> . ID
+    (59) primary -> . call
+    (60) call -> . ID LPAREN arguments RPAREN
+    (61) call -> . ID LPAREN RPAREN
+
+    DEDENT          shift and go to state 100
+    NEWLINE         shift and go to state 9
+    ID              shift and go to state 10
+    DEF             shift and go to state 12
+    IF              shift and go to state 14
+    RETURN          shift and go to state 15
+    MINUS           shift and go to state 20
+    NOT             shift and go to state 23
+    NUMBER          shift and go to state 24
+    STRING          shift and go to state 25
+    TRUE            shift and go to state 26
+    FALSE           shift and go to state 27
+    NONE            shift and go to state 28
+    LPAREN          shift and go to state 13
+
+    declaration                    shift and go to state 30
+    var_declaration                shift and go to state 4
+    fun_declaration                shift and go to state 5
+    if_statement                   shift and go to state 6
+    return_statement               shift and go to state 7
+    expression_statement           shift and go to state 8
+    expression                     shift and go to state 11
+    assignment                     shift and go to state 16
+    comparison                     shift and go to state 17
+    sum                            shift and go to state 18
+    mult                           shift and go to state 19
+    unary                          shift and go to state 21
+    primary                        shift and go to state 22
+    call                           shift and go to state 29
+
+state 88
+
+    (17) parameter -> ID COLON type .
+
+    COMMA           reduce using rule 17 (parameter -> ID COLON type .)
+    RPAREN          reduce using rule 17 (parameter -> ID COLON type .)
+
+
+state 89
+
+    (20) type -> INT .
+
+    COMMA           reduce using rule 20 (type -> INT .)
+    RPAREN          reduce using rule 20 (type -> INT .)
+    COLON           reduce using rule 20 (type -> INT .)
+
+
+state 90
+
+    (21) type -> STR .
+
+    COMMA           reduce using rule 21 (type -> STR .)
+    RPAREN          reduce using rule 21 (type -> STR .)
+    COLON           reduce using rule 21 (type -> STR .)
+
+
+state 91
+
+    (22) type -> FLOAT .
+
+    COMMA           reduce using rule 22 (type -> FLOAT .)
+    RPAREN          reduce using rule 22 (type -> FLOAT .)
+    COLON           reduce using rule 22 (type -> FLOAT .)
+
+
+state 92
+
+    (23) type -> BOOL .
+
+    COMMA           reduce using rule 23 (type -> BOOL .)
+    RPAREN          reduce using rule 23 (type -> BOOL .)
+    COLON           reduce using rule 23 (type -> BOOL .)
+
+
+state 93
+
+    (24) type -> LIST .
+
+    COMMA           reduce using rule 24 (type -> LIST .)
+    RPAREN          reduce using rule 24 (type -> LIST .)
+    COLON           reduce using rule 24 (type -> LIST .)
+
+
+state 94
+
+    (25) type -> DICT .
+
+    COMMA           reduce using rule 25 (type -> DICT .)
+    RPAREN          reduce using rule 25 (type -> DICT .)
+    COLON           reduce using rule 25 (type -> DICT .)
+
+
+state 95
+
+    (11) fun_declaration -> DEF ID LPAREN parameters RPAREN return_type . COLON block
+
+    COLON           shift and go to state 101
+
+
+state 96
+
+    (18) return_type -> ARROW . type
+    (20) type -> . INT
+    (21) type -> . STR
+    (22) type -> . FLOAT
+    (23) type -> . BOOL
+    (24) type -> . LIST
+    (25) type -> . DICT
+
+    INT             shift and go to state 89
+    STR             shift and go to state 90
+    FLOAT           shift and go to state 91
+    BOOL            shift and go to state 92
+    LIST            shift and go to state 93
+    DICT            shift and go to state 94
+
+    type                           shift and go to state 102
+
+state 97
+
+    (19) return_type -> empty .
+
+    COLON           reduce using rule 19 (return_type -> empty .)
+
+
+state 98
+
+    (15) parameter_list -> parameter_list COMMA parameter .
+
+    COMMA           reduce using rule 15 (parameter_list -> parameter_list COMMA parameter .)
+    RPAREN          reduce using rule 15 (parameter_list -> parameter_list COMMA parameter .)
+
+
+state 99
+
+    (27) if_statement -> IF expression COLON block ELSE COLON . block
+    (31) block -> . INDENT declaration_list DEDENT
+
+    INDENT          shift and go to state 81
+
+    block                          shift and go to state 103
+
+state 100
+
+    (31) block -> INDENT declaration_list DEDENT .
+
+    ELSE            reduce using rule 31 (block -> INDENT declaration_list DEDENT .)
+    NEWLINE         reduce using rule 31 (block -> INDENT declaration_list DEDENT .)
+    ID              reduce using rule 31 (block -> INDENT declaration_list DEDENT .)
+    DEF             reduce using rule 31 (block -> INDENT declaration_list DEDENT .)
+    IF              reduce using rule 31 (block -> INDENT declaration_list DEDENT .)
+    RETURN          reduce using rule 31 (block -> INDENT declaration_list DEDENT .)
+    MINUS           reduce using rule 31 (block -> INDENT declaration_list DEDENT .)
+    NOT             reduce using rule 31 (block -> INDENT declaration_list DEDENT .)
+    NUMBER          reduce using rule 31 (block -> INDENT declaration_list DEDENT .)
+    STRING          reduce using rule 31 (block -> INDENT declaration_list DEDENT .)
+    TRUE            reduce using rule 31 (block -> INDENT declaration_list DEDENT .)
+    FALSE           reduce using rule 31 (block -> INDENT declaration_list DEDENT .)
+    NONE            reduce using rule 31 (block -> INDENT declaration_list DEDENT .)
+    LPAREN          reduce using rule 31 (block -> INDENT declaration_list DEDENT .)
+    $end            reduce using rule 31 (block -> INDENT declaration_list DEDENT .)
+    DEDENT          reduce using rule 31 (block -> INDENT declaration_list DEDENT .)
+
+
+state 101
+
+    (11) fun_declaration -> DEF ID LPAREN parameters RPAREN return_type COLON . block
+    (31) block -> . INDENT declaration_list DEDENT
+
+    INDENT          shift and go to state 81
+
+    block                          shift and go to state 104
+
+state 102
+
+    (18) return_type -> ARROW type .
+
+    COLON           reduce using rule 18 (return_type -> ARROW type .)
+
+
+state 103
+
+    (27) if_statement -> IF expression COLON block ELSE COLON block .
+
+    NEWLINE         reduce using rule 27 (if_statement -> IF expression COLON block ELSE COLON block .)
+    ID              reduce using rule 27 (if_statement -> IF expression COLON block ELSE COLON block .)
+    DEF             reduce using rule 27 (if_statement -> IF expression COLON block ELSE COLON block .)
+    IF              reduce using rule 27 (if_statement -> IF expression COLON block ELSE COLON block .)
+    RETURN          reduce using rule 27 (if_statement -> IF expression COLON block ELSE COLON block .)
+    MINUS           reduce using rule 27 (if_statement -> IF expression COLON block ELSE COLON block .)
+    NOT             reduce using rule 27 (if_statement -> IF expression COLON block ELSE COLON block .)
+    NUMBER          reduce using rule 27 (if_statement -> IF expression COLON block ELSE COLON block .)
+    STRING          reduce using rule 27 (if_statement -> IF expression COLON block ELSE COLON block .)
+    TRUE            reduce using rule 27 (if_statement -> IF expression COLON block ELSE COLON block .)
+    FALSE           reduce using rule 27 (if_statement -> IF expression COLON block ELSE COLON block .)
+    NONE            reduce using rule 27 (if_statement -> IF expression COLON block ELSE COLON block .)
+    LPAREN          reduce using rule 27 (if_statement -> IF expression COLON block ELSE COLON block .)
+    $end            reduce using rule 27 (if_statement -> IF expression COLON block ELSE COLON block .)
+    DEDENT          reduce using rule 27 (if_statement -> IF expression COLON block ELSE COLON block .)
+
+
+state 104
+
+    (11) fun_declaration -> DEF ID LPAREN parameters RPAREN return_type COLON block .
+
+    NEWLINE         reduce using rule 11 (fun_declaration -> DEF ID LPAREN parameters RPAREN return_type COLON block .)
+    ID              reduce using rule 11 (fun_declaration -> DEF ID LPAREN parameters RPAREN return_type COLON block .)
+    DEF             reduce using rule 11 (fun_declaration -> DEF ID LPAREN parameters RPAREN return_type COLON block .)
+    IF              reduce using rule 11 (fun_declaration -> DEF ID LPAREN parameters RPAREN return_type COLON block .)
+    RETURN          reduce using rule 11 (fun_declaration -> DEF ID LPAREN parameters RPAREN return_type COLON block .)
+    MINUS           reduce using rule 11 (fun_declaration -> DEF ID LPAREN parameters RPAREN return_type COLON block .)
+    NOT             reduce using rule 11 (fun_declaration -> DEF ID LPAREN parameters RPAREN return_type COLON block .)
+    NUMBER          reduce using rule 11 (fun_declaration -> DEF ID LPAREN parameters RPAREN return_type COLON block .)
+    STRING          reduce using rule 11 (fun_declaration -> DEF ID LPAREN parameters RPAREN return_type COLON block .)
+    TRUE            reduce using rule 11 (fun_declaration -> DEF ID LPAREN parameters RPAREN return_type COLON block .)
+    FALSE           reduce using rule 11 (fun_declaration -> DEF ID LPAREN parameters RPAREN return_type COLON block .)
+    NONE            reduce using rule 11 (fun_declaration -> DEF ID LPAREN parameters RPAREN return_type COLON block .)
+    LPAREN          reduce using rule 11 (fun_declaration -> DEF ID LPAREN parameters RPAREN return_type COLON block .)
+    $end            reduce using rule 11 (fun_declaration -> DEF ID LPAREN parameters RPAREN return_type COLON block .)
+    DEDENT          reduce using rule 11 (fun_declaration -> DEF ID LPAREN parameters RPAREN return_type COLON block .)
+
+WARNING: 
+WARNING: Conflicts:
+WARNING: 
+WARNING: shift/reduce conflict for LPAREN in state 10 resolved as shift
+WARNING: shift/reduce conflict for ID in state 15 resolved as shift
+WARNING: shift/reduce conflict for MINUS in state 15 resolved as shift
+WARNING: shift/reduce conflict for NOT in state 15 resolved as shift
+WARNING: shift/reduce conflict for NUMBER in state 15 resolved as shift
+WARNING: shift/reduce conflict for STRING in state 15 resolved as shift
+WARNING: shift/reduce conflict for TRUE in state 15 resolved as shift
+WARNING: shift/reduce conflict for FALSE in state 15 resolved as shift
+WARNING: shift/reduce conflict for NONE in state 15 resolved as shift
+WARNING: shift/reduce conflict for LPAREN in state 15 resolved as shift
+WARNING: shift/reduce conflict for MINUS in state 18 resolved as shift
+WARNING: shift/reduce conflict for LPAREN in state 35 resolved as shift
+WARNING: shift/reduce conflict for LPAREN in state 50 resolved as shift
+WARNING: reduce/reduce conflict in state 53 resolved using rule (expression -> assignment)
+WARNING: rejected rule (assignment -> ID ASSIGN assignment) in state 53
