@@ -46,14 +46,14 @@ async def compile_code(request: CompileRequest):
             
             if parenthesis_stack:  # Si quedan paréntesis sin cerrar en esta línea
                 line_number = i + 1
-                error_msg = f"Error sintáctico en línea {line_number}: Paréntesis sin cerrar"
+                error_msg = f"Error léxico en línea {line_number}: Paréntesis sin cerrar"
                 open_paren_pos = line.rfind('(')
                 
                 response["success"] = False
-                response["phase"] = "syntactic"
+                response["phase"] = "lexical"
                 response["errors"].append(error_msg)
                 response["errors"].append(f"En el código:\n    {line}\n    {' ' * open_paren_pos}^ Falta el paréntesis de cierre")
-                response["output"].append(f"❌ Error sintáctico en línea {line_number}:")
+                response["output"].append(f"❌ Error léxico en línea {line_number}:")
                 response["output"].append(error_msg)
 
         # Verificar paréntesis sin cerrar primero (verificación preliminar)
