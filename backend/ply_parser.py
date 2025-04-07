@@ -466,56 +466,58 @@ Ejemplo correcto: {func_name}(5) o {func_name}(5, 10)"""
         
         # Obtener la línea completa donde está el error
         line = self.source_lines[p.lineno - 1]
-        
-        # Si la línea es un comentario, ignorarla
-        if line.strip().startswith('#'):
-            return
-        
         column = p.lexpos - sum(len(l) + 1 for l in self.source_lines[:p.lineno - 1])
-
-        # Detectar errores específicos de sintaxis
-        if p.type == 'RPAREN' and ',' in line and line.strip().endswith(')'):
-            # Detectar argumentos faltantes en llamadas a funciones
-            func_name = line[:line.find('(')].strip()
-            error_msg = f"""Error sintáctico en línea {p.lineno}: Argumento faltante en la llamada a la función '{func_name}'
+        
+        # Verificar diferentes tipos de errores sintácticos
+        if 'def' in line and ':' not in line:
+            error_msg = f"""Error sintáctico en línea {p.lineno}: Falta el símbolo ':' después de la definición de función
 En el código:
     {line}
-    {' ' * (line.rfind(',') + 1)}^ Falta un argumento después de la coma
-Ejemplo correcto: {line.replace(',)', ', 10)')}
-Sugerencia: Las llamadas a funciones deben tener todos sus argumentos especificados"""
-        elif p.type == 'STRING' or (p.type in ['LPAREN', 'RPAREN'] and '"' in line or "'" in line):
-            # Verificar comillas no balanceadas
-            quote_char = '"' if '"' in line else "'"
-            if line.count(quote_char) % 2 != 0:
-                # Construir el ejemplo correcto
-                start_quote_pos = line.find(quote_char)
-                unclosed_text = line[start_quote_pos + 1:]
-                correct_example = f"{line[:start_quote_pos]}{quote_char}{unclosed_text}{quote_char})"
-                
-                error_msg = f"""Error sintáctico en línea {p.lineno}: Cadena de texto no cerrada correctamente
+    {' ' * (len(line))}^ Falta el ':' aquí
+Sugerencia: {line}:"""
+        
+        elif 'if' in line and ':' not in line:
+            error_msg = f"""Error sintáctico en línea {p.lineno}: Falta el símbolo ':' después de la condición if
 En el código:
     {line}
-    {' ' * start_quote_pos}^ La cadena comienza aquí pero no se cierra correctamente
-Sugerencia: Asegúrate de cerrar la cadena con {quote_char}
-Ejemplo correcto: {correct_example}"""
-        elif 'def' in line and ':' not in line:
-            error_msg = f"""Error sintáctico en línea {p.lineno}: Falta el ':' después de la definición de función
+    {' ' * (len(line))}^ Falta el ':' aquí
+Sugerencia: {line}:"""
+        
+        elif '(' in line and ')' not in line:
+            open_paren_pos = line.find('(')
+            error_msg = f"""Error sintáctico en línea {p.lineno}: Paréntesis sin cerrar
 En el código:
     {line}
-    {' ' * len(line)}^ Falta el ':' aquí
-Ejemplo correcto: {line}:"""
+    {' ' * open_paren_pos}^ El paréntesis abierto aquí no tiene su cierre
+Sugerencia: {line})"""
+        
+        elif 'print' in line and '(' in line and ')' not in line:
+            error_msg = f"""Error sintáctico en línea {p.lineno}: Falta el paréntesis de cierre en la función print
+En el código:
+    {line}
+    {' ' * len(line)}^ Falta el ')' aquí
+Sugerencia: {line})"""
+        
+        elif p.type == 'INDENT':
+            error_msg = f"""Error sintáctico en línea {p.lineno}: Indentación incorrecta
+En el código:
+    {line}
+^ La línea debe estar indentada con 4 espacios
+Sugerencia:
+    {line}"""
+        
         else:
             # Mensaje genérico para otros errores sintácticos
             error_msg = f"""Error sintáctico en línea {p.lineno}: Token inesperado '{p.value}'
 En el código:
     {line}
     {' ' * column}^ Aquí"""
-
+        
         self.errors.append(error_msg)
         
         # Intentar recuperarse del error
         while True:
             tok = self.parser.token()
-            if not tok or tok.type == 'NEWLINE':
+            if not tok or tok.type in ['NEWLINE', 'DEDENT']:
                 break
         self.parser.errok()

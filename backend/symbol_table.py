@@ -40,6 +40,9 @@ class SymbolTable:
         self.current_scope: Scope = Scope(scope_type="global")
         self.global_scope: Scope = self.current_scope
         self.errors = []  # Para rastrear errores semánticos
+        self.indent_stack = [0]  # Para rastrear niveles de indentación
+        self.paren_stack = []    # Para rastrear paréntesis
+        self.block_stack = []    # Para rastrear bloques (if, def, etc)
         
         # Definir tipos y funciones built-in
         self._define_builtins()
@@ -142,4 +145,60 @@ class SymbolTable:
                 f"Variable '{var_name}' no está definida"
             )
             return False
+        return True
+
+    def check_indentation(self, line_no: int, indent_level: int) -> bool:
+        """Verifica que la indentación sea correcta"""
+        expected_indent = self.indent_stack[-1]
+        if indent_level != expected_indent:
+            self.errors.append(
+                f"""Error sintáctico en línea {line_no}: Indentación incorrecta
+Se esperaban {expected_indent} espacios, pero se encontraron {indent_level}
+Sugerencia: Usa {expected_indent} espacios para mantener el nivel de indentación correcto"""
+            )
+            return False
+        return True
+
+    def check_block_structure(self, line: str, line_no: int) -> bool:
+        """Verifica la estructura correcta de bloques"""
+        if ':' in line:
+            if 'def' in line or 'if' in line or 'for' in line or 'while' in line:
+                self.block_stack.append(line_no)
+                self.indent_stack.append(self.indent_stack[-1] + 4)
+        
+        # Verificar paréntesis
+        for char in line:
+            if char == '(':
+                self.paren_stack.append((line_no, len(self.paren_stack)))
+            elif char == ')':
+                if not self.paren_stack:
+                    self.errors.append(
+                        f"""Error sintáctico en línea {line_no}: Paréntesis de cierre sin su correspondiente apertura
+En el código:
+    {line}
+    {' ' * line.find(')')}^ Este paréntesis no tiene su apertura correspondiente"""
+                    )
+                    return False
+                self.paren_stack.pop()
+        
+        return True
+
+    def check_unclosed_structures(self):
+        """Verifica estructuras sin cerrar al final del archivo"""
+        if self.paren_stack:
+            line_no, pos = self.paren_stack[-1]
+            self.errors.append(
+                f"""Error sintáctico en línea {line_no}: Paréntesis sin cerrar
+Hay {len(self.paren_stack)} paréntesis sin cerrar desde la línea {line_no}"""
+            )
+            return False
+        
+        if len(self.block_stack) > 0:
+            self.errors.append(
+                f"""Error sintáctico: Bloques sin cerrar
+Hay {len(self.block_stack)} bloques que comenzaron pero no se cerraron correctamente
+Verifica la indentación de los bloques que comienzan en las líneas: {', '.join(map(str, self.block_stack))}"""
+            )
+            return False
+        
         return True 

@@ -18,6 +18,11 @@ export interface CompileResponse {
   ast: any
   output: string[]
   phase: 'lexical' | 'syntactic' | 'semantic' | 'error'
+  analysis?: {
+    lexical: { success: boolean, errors: string[], tokens?: Token[] }
+    syntactic: { success: boolean, errors: string[] }
+    semantic: { success: boolean, errors: string[] }
+  }
 }
 
 function App() {
@@ -69,7 +74,52 @@ print(resultado)
           errors: ['Por favor, escribe algún código Python para compilar'],
           ast: null,
           output: [],
-          phase: 'error'
+          phase: 'error',
+          analysis: {
+            lexical: { success: false, errors: ['Por favor, escribe algún código Python para compilar'] },
+            syntactic: { success: false, errors: [] },
+            semantic: { success: false, errors: [] }
+          }
+        })
+        setLoading(false)
+        return
+      }
+
+      // Validación de caracteres especiales
+      const invalidCharsRegex = /[@$¿¡]/g
+      const invalidChars = code.match(invalidCharsRegex)
+      if (invalidChars) {
+        const lines = code.split('\n')
+        const errors: string[] = []
+        
+        lines.forEach((line, lineIndex) => {
+          const invalidCharPositions = [...line.matchAll(invalidCharsRegex)]
+          invalidCharPositions.forEach(match => {
+            if (match.index !== undefined) {
+              errors.push(`Error léxico en línea ${lineIndex + 1}: Carácter no válido '${match[0]}'
+En el código:
+    ${line}
+    ${' '.repeat(match.index)}^ Aquí se encontró el carácter no válido`)
+            }
+          })
+        })
+
+        setResult({
+          success: false,
+          tokens: [],
+          errors: errors,
+          ast: null,
+          output: [],
+          phase: 'lexical',
+          analysis: {
+            lexical: { 
+              success: false, 
+              tokens: [],
+              errors: errors
+            },
+            syntactic: { success: false, errors: [] },
+            semantic: { success: false, errors: [] }
+          }
         })
         setLoading(false)
         return
@@ -80,13 +130,7 @@ print(resultado)
         { code }
       )
       
-      // Extraer tokens del output
-      const tokens = parseTokensFromOutput(response.data.output)
-      
-      setResult({
-        ...response.data,
-        tokens: tokens
-      })
+      setResult(response.data)
     } catch (error) {
       console.error('Error al compilar:', error)
       setResult({

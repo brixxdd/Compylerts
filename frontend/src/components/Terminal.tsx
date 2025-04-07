@@ -37,17 +37,7 @@ function Terminal({ code, result, loading }: TerminalProps) {
           <div className="terminal-line">Analizando...</div>
         ) : result ? (
           <>
-            <div className="terminal-line">Tokens encontrados:</div>
-            <div className="terminal-line">----------------------------------------</div>
-            {result.output
-              .filter(line => !line.startsWith('❌') && !line.startsWith('✅'))
-              .map((line, index) => (
-                <div key={index} className="terminal-line">
-                  {line}
-                </div>
-            ))}
-
-            {/* Mostrar errores en orden: léxicos -> sintácticos -> semánticos */}
+            {/* Mostrar solo errores en orden: léxicos -> sintácticos -> semánticos */}
             {result.errors.length > 0 && (
               <>
                 {result.phase === 'lexical' && (
