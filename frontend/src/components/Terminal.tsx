@@ -40,21 +40,34 @@ function Terminal({ code, result, loading }: TerminalProps) {
             {/* Mostrar solo errores en orden: léxicos -> sintácticos -> semánticos */}
             {result.errors.length > 0 && (
               <>
-                {result.phase === 'lexical' && (
-                  <div className="terminal-line error-text">
-                    ❌ Errores léxicos encontrados:
-                  </div>
-                )}
-                {result.phase === 'syntactic' && (
-                  <div className="terminal-line error-text">
-                    ❌ Errores sintácticos encontrados:
-                  </div>
-                )}
-                {result.phase === 'semantic' && (
-                  <div className="terminal-line error-text">
-                    ❌ Errores semánticos encontrados:
-                  </div>
-                )}
+                {/* Determinar el tipo de error basado en contenido y fase */}
+                {(() => {
+                  const errorMessages = result.errors.join(' ');
+                  
+                  if (result.phase === 'lexical' || errorMessages.includes('Error léxico')) {
+                    return (
+                      <div className="terminal-line error-text">
+                        ❌ Errores léxicos encontrados:
+                      </div>
+                    );
+                  } else if (
+                    result.phase === 'semantic' || 
+                    errorMessages.includes('Error semántico')
+                  ) {
+                    return (
+                      <div className="terminal-line error-text">
+                        ❌ Errores encontrados:
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div className="terminal-line error-text">
+                        ❌ Errores sintácticos encontrados:
+                      </div>
+                    );
+                  }
+                })()}
+                
                 {result.errors.map((error, index) => (
                   <div key={index} className="terminal-line error-text">
                     {error.split('\n').map((line, i) => (

@@ -221,12 +221,12 @@ En el código:
         tok = self.lexer.token()
         if not tok:
             if self.paren_stack:
-                # Extraer información de los paréntesis sin cerrar
+                # Estandarizar como error sintáctico
                 for line_no, pos in self.paren_stack:
                     if 0 <= line_no - 1 < len(self.source_lines):
                         line = self.source_lines[line_no - 1]
                         column = pos - sum(len(l) + 1 for l in self.source_lines[:line_no - 1])
-                        self.errors.append(f"""Error léxico en línea {line_no}: Paréntesis sin cerrar
+                        self.errors.append(f"""Error sintáctico en línea {line_no}: Paréntesis sin cerrar
 En el código:
     {line}
     {' ' * column}^ Falta el paréntesis de cierre ')'

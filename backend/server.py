@@ -34,58 +34,39 @@ async def compile_code(request: CompileRequest):
             "phase": "lexical"  # Empezamos con fase léxica
         }
 
-        # Verificar paréntesis sin cerrar por línea
-        lines = code.split('\n')
-        for i, line in enumerate(lines):
-            parenthesis_stack = []
-            for char in line:
-                if char == '(':
-                    parenthesis_stack.append(char)
-                elif char == ')' and parenthesis_stack:
-                    parenthesis_stack.pop()
-            
-            if parenthesis_stack:  # Si quedan paréntesis sin cerrar en esta línea
-                line_number = i + 1
-                error_msg = f"Error léxico en línea {line_number}: Paréntesis sin cerrar"
-                open_paren_pos = line.rfind('(')
-                
-                response["success"] = False
-                response["phase"] = "lexical"
-                response["errors"].append(error_msg)
-                response["errors"].append(f"En el código:\n    {line}\n    {' ' * open_paren_pos}^ Falta el paréntesis de cierre")
-                response["output"].append(f"❌ Error léxico en línea {line_number}:")
-                response["output"].append(error_msg)
-
-        # Verificar paréntesis sin cerrar primero (verificación preliminar)
+        # Verificación única y coherente de paréntesis
+        all_errors = []
         parenthesis_stack = []
         line_number = 1
-        last_open_paren_line = 0
-        
+
         for i, char in enumerate(code):
             if char == '(':
-                parenthesis_stack.append((char, line_number))
+                parenthesis_stack.append((line_number, i))
             elif char == ')' and parenthesis_stack:
                 parenthesis_stack.pop()
             elif char == '\n':
                 line_number += 1
-        
-        # Si quedan paréntesis sin cerrar, reportar error específico
+
+        # Reportar los paréntesis sin cerrar
         if parenthesis_stack:
-            paren_char, paren_line = parenthesis_stack[0]
-            error_msg = f"Error sintáctico en línea {paren_line}: Paréntesis sin cerrar '(' que no tiene su correspondiente ')'"
-            
-            # Encontrar la línea con el paréntesis sin cerrar
-            line = code.split('\n')[paren_line - 1]
-            
-            # Agregar contexto al error
             response["success"] = False
             response["phase"] = "syntactic"
-            response["errors"].append(error_msg)
-            response["errors"].append(f"En el código:\n    {line}\n    ^ Falta el paréntesis de cierre")
-            response["output"].append("❌ Error sintáctico encontrado:")
-            response["output"].append(error_msg)
+            
+            for paren_line, paren_pos in parenthesis_stack:
+                # Calcular la posición en la línea
+                line = code.split('\n')[paren_line - 1]
+                column = paren_pos - sum(len(l) + 1 for l in code.split('\n')[:paren_line - 1])
+                
+                error_msg = f"Error sintáctico en línea {paren_line}: Paréntesis sin cerrar"
+                response["errors"].append(error_msg)
+                response["errors"].append(f"En el código:\n    {line}\n    {' ' * column}^ Falta el paréntesis de cierre ')'")
+            
+            response["output"].append("❌ Errores sintácticos encontrados:")
+            for error in response["errors"]:
+                response["output"].append(error)
+            
             return response
-        
+
         # Fase 1: Análisis Léxico
         lexer = PLYLexer(code)
         
@@ -118,13 +99,28 @@ async def compile_code(request: CompileRequest):
         parser = PLYParser()
         result = parser.parse(code)
 
+        # Verificar si hay errores semánticos en los mensajes de error sintácticos
+        contains_semantic_error = False
         if parser.errors:
+            for error in parser.errors:
+                if "Error semántico" in error:
+                    contains_semantic_error = True
+                    break
+
+        if contains_semantic_error:
+            # Si contiene errores semánticos, clasificarlos correctamente
+            response["success"] = False
+            response["phase"] = "semantic"
+            response["errors"].extend(parser.errors)
+            response["output"].append("❌ Errores semánticos encontrados:")
+            response["output"].extend(parser.errors)
+        elif parser.errors:  # Errores sintácticos puros
             response["success"] = False
             response["phase"] = "syntactic"
             response["errors"].extend(parser.errors)
             response["output"].append("❌ Errores sintácticos encontrados:")
             response["output"].extend(parser.errors)
-        elif parser.semantic_errors:
+        elif parser.semantic_errors:  # Errores semánticos reportados correctamente
             response["success"] = False
             response["phase"] = "semantic"
             response["errors"].extend(parser.semantic_errors)
