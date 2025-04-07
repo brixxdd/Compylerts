@@ -485,56 +485,30 @@ Ejemplo correcto: {func_name}(5) o {func_name}(5, 10)"""
         line = self.source_lines[p.lineno - 1]
         column = p.lexpos - sum(len(l) + 1 for l in self.source_lines[:p.lineno - 1])
         
-        # Verificar diferentes tipos de errores sintácticos
-        if 'def' in line and ':' not in line:
-            error_msg = f"""Error sintáctico en línea {p.lineno}: Falta el símbolo ':' después de la definición de función
+        # Verificar si es un error común
+        if p.type == 'ID' and p.value == 'retun':
+            error_msg = f"""Error sintáctico en línea {p.lineno}: Error tipográfico '{p.value}'
 En el código:
     {line}
-    {' ' * (len(line))}^ Falta el ':' aquí
-Sugerencia: {line}:"""
-        
-        elif 'if' in line and ':' not in line:
-            error_msg = f"""Error sintáctico en línea {p.lineno}: Falta el símbolo ':' después de la condición if
-En el código:
-    {line}
-    {' ' * (len(line))}^ Falta el ':' aquí
-Sugerencia: {line}:"""
-        
-        elif '(' in line and ')' not in line:
-            open_paren_pos = line.find('(')
-            error_msg = f"""Error sintáctico en línea {p.lineno}: Paréntesis sin cerrar
-En el código:
-    {line}
-    {' ' * open_paren_pos}^ El paréntesis abierto aquí no tiene su cierre
-Sugerencia: {line})"""
-        
-        elif 'print' in line and '(' in line and ')' not in line:
-            error_msg = f"""Error sintáctico en línea {p.lineno}: Falta el paréntesis de cierre en la función print
-En el código:
-    {line}
-    {' ' * len(line)}^ Falta el ')' aquí
-Sugerencia: {line})"""
-        
-        elif p.type == 'INDENT':
-            error_msg = f"""Error sintáctico en línea {p.lineno}: Indentación incorrecta
-En el código:
-    {line}
-^ La línea debe estar indentada con 4 espacios
-Sugerencia:
-    {line}"""
-        
+    {' ' * column}^ '¿Quisiste decir 'return'?"
+Sugerencia: {line.replace('retun', 'return')}"""
+            self.errors.append(error_msg)
         else:
             # Mensaje genérico para otros errores sintácticos
             error_msg = f"""Error sintáctico en línea {p.lineno}: Token inesperado '{p.value}'
 En el código:
     {line}
     {' ' * column}^ Aquí"""
+            self.errors.append(error_msg)
         
-        self.errors.append(error_msg)
-        
-        # Intentar recuperarse del error
+        # Intentar recuperarse del error y continuar
+        # Más agresivamente que antes
+        parser = self.parser
         while True:
-            tok = self.parser.token()
-            if not tok or tok.type in ['NEWLINE', 'DEDENT']:
+            # Obtener el siguiente token
+            tok = parser.token()
+            if not tok or tok.type in ['NEWLINE', 'DEDENT', 'KEYWORD']:
                 break
-        self.parser.errok()
+        
+        # Intentar sincronizarse con NEWLINE o KEYWORD de inicio de bloque
+        parser.errok()

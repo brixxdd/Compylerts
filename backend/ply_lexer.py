@@ -117,18 +117,22 @@ class PLYLexer:
             'pirnt': 'print',
             'lenght': 'length',
             'retrun': 'return',
+            'retun': 'return',
             'inut': 'input',
             'inpt': 'input',
             'imput': 'input'
         }
         
         if t.value in common_typos:
-            self.errors.append(f"""Error léxico en línea {t.lexer.lineno}: '{t.value}' no es una función válida
+            error_msg = f"""Error léxico en línea {t.lexer.lineno}: '{t.value}' no es una palabra clave o función válida
 En el código:
     {self.source_lines[t.lexer.lineno - 1]}
-    {' ' * self.source_lines[t.lexer.lineno - 1].find(t.value)}^ ¿Quisiste decir '{common_typos[t.value]}'?""")
-            self.valid_code = False
-            return None
+    {' ' * self.source_lines[t.lexer.lineno - 1].find(t.value)}^ ¿Quisiste decir '{common_typos[t.value]}'?"""
+            self.errors.append(error_msg)
+            
+            # Importante: NO establecer valid_code a False para permitir que el análisis continúe
+            # En su lugar, corregir automáticamente el error para continuar
+            t.value = common_typos[t.value]
         
         if t.value in self.keywords:
             t.type = 'KEYWORD'

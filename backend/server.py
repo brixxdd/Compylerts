@@ -67,6 +67,37 @@ async def compile_code(request: CompileRequest):
             
             return response
 
+        # Añadir verificación especial para errores tipográficos
+        contains_typo_error = False
+        typo_errors = []
+
+        for i, line in enumerate(code.split('\n')):
+            # Buscar errores tipográficos comunes
+            typo_checks = {
+                'retun': 'return',
+                'pritn': 'print',
+                'lenght': 'length'
+            }
+            
+            for typo, correction in typo_checks.items():
+                if typo in line and correction not in line:
+                    line_num = i + 1
+                    col_pos = line.find(typo)
+                    typo_errors.append(f"""Error léxico en línea {line_num}: Error tipográfico '{typo}'
+En el código:
+    {line}
+    {' ' * col_pos}^ ¿Quisiste decir '{correction}'?
+Sugerencia: {line.replace(typo, correction)}""")
+                    contains_typo_error = True
+
+        if contains_typo_error:
+            response["success"] = False
+            response["phase"] = "lexical"
+            response["errors"].extend(typo_errors)
+            response["output"].append("❌ Errores léxicos encontrados:")
+            response["output"].extend(typo_errors)
+            # No retornamos aquí para permitir que el análisis continúe
+
         # Fase 1: Análisis Léxico
         lexer = PLYLexer(code)
         
