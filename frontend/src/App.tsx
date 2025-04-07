@@ -3,6 +3,7 @@ import Editor from '@monaco-editor/react'
 import axios from 'axios'
 import './App.css'
 import Welcome from './components/Welcome'
+import Terminal from './components/Terminal'
 
 interface Token {
   type: string
@@ -10,12 +11,13 @@ interface Token {
   line: number
 }
 
-interface CompileResponse {
+export interface CompileResponse {
   success: boolean
   tokens: Token[]
   errors: string[]
   ast: any
   output: string[]
+  phase: 'lexical' | 'syntactic' | 'semantic' | 'error'
 }
 
 function App() {
@@ -66,7 +68,8 @@ print(resultado)
           tokens: [],
           errors: ['Por favor, escribe algún código Python para compilar'],
           ast: null,
-          output: []
+          output: [],
+          phase: 'error'
         })
         setLoading(false)
         return
@@ -91,7 +94,8 @@ print(resultado)
         tokens: [],
         errors: ['Error al conectar con el servidor'],
         ast: null,
-        output: []
+        output: [],
+        phase: 'error'
       })
     }
     setLoading(false)
@@ -107,38 +111,52 @@ print(resultado)
           
           <div className="split-layout">
             <div className="editor-section">
-              <div className="editor-container">
-                <Editor
-                  height="100%"
-                  defaultLanguage="python"
-                  theme="vs-dark"
-                  value={code}
-                  onChange={(value: string | undefined) => setCode(value || '')}
-                  options={{
-                    minimap: { enabled: false },
-                    fontSize: 14,
-                    lineNumbers: 'on',
-                    tabSize: 4,
-                    insertSpaces: true,
-                    detectIndentation: true,
-                    trimAutoWhitespace: false,
-                    renderWhitespace: "selection",
-                  }}
-                />
+              <div className="terminal-window">
+                <div className="terminal-header">
+                  <span className="terminal-title">editor.py</span>
+                  <div className="terminal-buttons">
+                    <span className="terminal-button minimize"></span>
+                    <span className="terminal-button maximize"></span>
+                    <span className="terminal-button close"></span>
+                  </div>
+                </div>
+                <div className="editor-terminal-content">
+                  <Editor
+                    height="100%"
+                    defaultLanguage="python"
+                    theme="vs-dark"
+                    value={code}
+                    onChange={(value: string | undefined) => setCode(value || '')}
+                    options={{
+                      minimap: { enabled: false },
+                      fontSize: 14,
+                      lineNumbers: 'on',
+                      tabSize: 4,
+                      insertSpaces: true,
+                      detectIndentation: true,
+                      trimAutoWhitespace: false,
+                      renderWhitespace: "selection",
+                      scrollBeyondLastLine: false,
+                      padding: { top: 10, bottom: 10 },
+                    }}
+                  />
+                </div>
+                <div className="terminal-footer">
+                  <button 
+                    onClick={handleCompile}
+                    disabled={loading}
+                    className="compile-button"
+                  >
+                    {loading ? 'Compilando...' : 'Compilar'}
+                  </button>
+                </div>
               </div>
-              <button 
-                onClick={handleCompile}
-                disabled={loading}
-                className="compile-button"
-              >
-                {loading ? 'Compilando...' : 'Compilar'}
-              </button>
             </div>
 
             <div className="terminal-section">
-              <div className="terminal-content">
-                <div className="tokens-section">
-                  <h3>Tabla de Tokens</h3>
+              <div className="tokens-section">
+                <h3>Tabla de Tokens</h3>
+                <div className="token-table-container">
                   {result && result.tokens && result.tokens.length > 0 ? (
                     <table className="token-table">
                       <thead>
@@ -162,36 +180,13 @@ print(resultado)
                     <div className="output-line">No hay tokens para mostrar</div>
                   )}
                 </div>
-
-                <div className="console-section">
-                  <h3>Consola</h3>
-                  {result ? (
-                    result.success ? (
-                      <div className="success-message">
-                        <div>✅ Compilación exitosa</div>
-                        {result.output && result.output.filter(line => 
-                          !line.includes(':') || 
-                          line.includes('----------------------------------------') ||
-                          line.includes('encontraron errores') ||
-                          line.includes('Análisis completado')
-                        ).map((line, index) => (
-                          <div key={index} className="output-line">{line}</div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="errors-container">
-                        {result.errors && result.errors.map((error, index) => (
-                          <div key={index} className="error-message">{error}</div>
-                        ))}
-                      </div>
-                    )
-                  ) : (
-                    <div className="output-line">
-                      // El resultado de la compilación aparecerá aquí
-                    </div>
-                  )}
-                </div>
               </div>
+
+              <Terminal 
+                code={code}
+                result={result}
+                loading={loading}
+              />
             </div>
           </div>
         </div>
