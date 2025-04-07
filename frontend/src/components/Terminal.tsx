@@ -57,7 +57,9 @@ function Terminal({ code, result, loading }: TerminalProps) {
                 )}
                 {result.errors.map((error, index) => (
                   <div key={index} className="terminal-line error-text">
-                    {error}
+                    {error.split('\n').map((line, i) => (
+                      <div key={i}>{line}</div>
+                    ))}
                   </div>
                 ))}
               </>

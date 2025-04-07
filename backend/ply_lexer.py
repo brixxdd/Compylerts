@@ -43,6 +43,7 @@ tokens = (
     'PLUS', 'MINUS', 'TIMES', 'DIVIDE', 'MOD',
     'EQ', 'NE', 'LT', 'GT', 'LE', 'GE',
     'LPAREN', 'RPAREN', 
+    'LBRACKET', 'RBRACKET',  # Nuevos tokens para corchetes
     'COMMA', 'COLON',
     'ASSIGN', 'NEWLINE', 'INDENT', 'DEDENT',
     'KEYWORD', 'ARROW', 'TRAILING_COMMA'
@@ -73,11 +74,18 @@ class PLYLexer:
     t_GT = r'>'
     t_LE = r'<='
     t_GE = r'>='
-    t_LPAREN = r'\('
-    t_RPAREN = r'\)'
     t_COLON = r':'
     t_ASSIGN = r'='
     
+    # Reglas para corchetes (ahora correctamente indentadas dentro de la clase)
+    def t_LBRACKET(self, t):
+        r'\['
+        return t
+
+    def t_RBRACKET(self, t):
+        r'\]'
+        return t
+
     # Ignorar espacios y tabs (excepto para indentación)
     t_ignore = ' \t'
     
@@ -93,6 +101,7 @@ class PLYLexer:
         # Variables para manejar indentación
         self.indent_stack = [0]
         self.tokens_queue = []
+        self.paren_stack = []  # Nueva pila para rastrear paréntesis
     
     def t_ID(self, t):
         r'[a-zA-Z_][a-zA-Z0-9_]*'
@@ -134,43 +143,47 @@ En el código:
         return t
     
     def t_STRING(self, t):
-        r'\"[^\"]*\"?|\'[^\']*\'?'  # Modificamos la regex para aceptar cadenas incompletas
-        # La cadena puede o no terminar con comilla (?)
-        t.value = t.value[1:]  # Quitamos solo la comilla inicial
-        if t.value.endswith('"') or t.value.endswith("'"):
-            t.value = t.value[:-1]  # Quitamos la comilla final solo si existe
+        r'\"[^\"]*\"|\'[^\']*\''
+        if not (t.value.startswith('"') and t.value.endswith('"')) or \
+           not (t.value.startswith("'") and t.value.endswith("'")):
+            line = self.source_lines[t.lexer.lineno - 1]
+            column = t.lexpos - sum(len(l) + 1 for l in self.source_lines[:t.lexer.lineno - 1])
+            self.errors.append(f"""Error léxico en línea {t.lexer.lineno}: Cadena sin cerrar
+En el código:
+    {line}
+    {' ' * column}^ Aquí""")
+            self.valid_code = False
+            return None
+        t.value = t.value[1:-1]  # Quitar las comillas
         return t
     
     def t_NEWLINE(self, t):
         r'\n+'
         t.lexer.lineno += len(t.value)
-        self.lineno = t.lexer.lineno  # Actualizar nuestro contador de línea
+        self.lineno = t.lexer.lineno
         
-        # Calcular indentación
         if t.lexer.lexpos < len(t.lexer.lexdata):
             pos = t.lexer.lexpos
             while pos < len(t.lexer.lexdata) and t.lexer.lexdata[pos] in ' \t':
                 pos += 1
             
-            # Si la línea no está vacía y no es un comentario
             if pos < len(t.lexer.lexdata) and t.lexer.lexdata[pos] != '\n' and t.lexer.lexdata[pos:pos+1] != '#':
                 indent = pos - t.lexer.lexpos
                 
-                # Comparar con el nivel de indentación actual
                 if indent > self.indent_stack[-1]:
-                    # Aumentar indentación
                     self.indent_stack.append(indent)
                     self.tokens_queue.append(('INDENT', 'INDENT', self.lineno))
                 elif indent < self.indent_stack[-1]:
-                    # Disminuir indentación
                     while indent < self.indent_stack[-1]:
                         self.indent_stack.pop()
                         self.tokens_queue.append(('DEDENT', 'DEDENT', self.lineno))
                     
-                    # Verificar que la indentación coincida con un nivel anterior
                     if indent != self.indent_stack[-1]:
-                        self.errors.append(f"Error en línea {self.lineno}: Indentación inconsistente")
-        
+                        expected_indent = self.indent_stack[-1]
+                        self.errors.append(
+                            f"Error en línea {self.lineno}: Indentación inconsistente. "
+                            f"Se esperaba un nivel de {expected_indent} espacios."
+                        )
         return t
     
     def t_COMMENT(self, t):
@@ -204,17 +217,28 @@ En el código:
             tok.lexpos = 0
             return tok
         
-        # Si no hay más tokens en el input, emitir DEDENT pendientes
+        # Si no hay más tokens en el input, verificar paréntesis sin cerrar
         tok = self.lexer.token()
-        if not tok and self.indent_stack[-1] > 0:
-            # Emitir DEDENT para cada nivel de indentación pendiente
-            while len(self.indent_stack) > 1:
-                self.indent_stack.pop()
-                self.tokens_queue.append(('DEDENT', 'DEDENT', self.lineno))
-            return self.token()  # Llamada recursiva para obtener el DEDENT de la cola
+        if not tok:
+            if self.paren_stack:
+                # Extraer información de los paréntesis sin cerrar
+                for line_no, pos in self.paren_stack:
+                    if 0 <= line_no - 1 < len(self.source_lines):
+                        line = self.source_lines[line_no - 1]
+                        column = pos - sum(len(l) + 1 for l in self.source_lines[:line_no - 1])
+                        self.errors.append(f"""Error léxico en línea {line_no}: Paréntesis sin cerrar
+En el código:
+    {line}
+    {' ' * column}^ Falta el paréntesis de cierre ')'
+Sugerencia: {line[:column+1]})""")
+            if self.indent_stack[-1] > 0:
+                while len(self.indent_stack) > 1:
+                    self.indent_stack.pop()
+                    self.tokens_queue.append(('DEDENT', 'DEDENT', self.lineno))
+                return self.token()
         
         if tok:
-            tok.lineno = self.lineno  # Asignar el número de línea actual
+            tok.lineno = self.lineno
         
         return tok
 
@@ -278,3 +302,19 @@ Ejemplo correcto: {func_name}(5, 10)"""
         except Exception as e:
             self.errors.append(f"Error inesperado: {str(e)}")
             return None
+
+    def t_LPAREN(self, t):
+        r'\('
+        # Guarda posición y línea del paréntesis abierto
+        self.paren_stack.append((t.lexer.lineno, t.lexpos))
+        return t
+
+    def t_RPAREN(self, t):
+        r'\)'
+        if not self.paren_stack:
+            line = self.source_lines[t.lexer.lineno - 1]
+            column = t.lexpos - sum(len(l) + 1 for l in self.source_lines[:t.lexer.lineno - 1])
+            self.errors.append(f"Error léxico en línea {t.lexer.lineno}: Paréntesis de cierre sin coincidencia")
+        else:
+            self.paren_stack.pop()
+        return t

@@ -34,6 +34,58 @@ async def compile_code(request: CompileRequest):
             "phase": "lexical"  # Empezamos con fase léxica
         }
 
+        # Verificar paréntesis sin cerrar por línea
+        lines = code.split('\n')
+        for i, line in enumerate(lines):
+            parenthesis_stack = []
+            for char in line:
+                if char == '(':
+                    parenthesis_stack.append(char)
+                elif char == ')' and parenthesis_stack:
+                    parenthesis_stack.pop()
+            
+            if parenthesis_stack:  # Si quedan paréntesis sin cerrar en esta línea
+                line_number = i + 1
+                error_msg = f"Error sintáctico en línea {line_number}: Paréntesis sin cerrar"
+                open_paren_pos = line.rfind('(')
+                
+                response["success"] = False
+                response["phase"] = "syntactic"
+                response["errors"].append(error_msg)
+                response["errors"].append(f"En el código:\n    {line}\n    {' ' * open_paren_pos}^ Falta el paréntesis de cierre")
+                response["output"].append(f"❌ Error sintáctico en línea {line_number}:")
+                response["output"].append(error_msg)
+
+        # Verificar paréntesis sin cerrar primero (verificación preliminar)
+        parenthesis_stack = []
+        line_number = 1
+        last_open_paren_line = 0
+        
+        for i, char in enumerate(code):
+            if char == '(':
+                parenthesis_stack.append((char, line_number))
+            elif char == ')' and parenthesis_stack:
+                parenthesis_stack.pop()
+            elif char == '\n':
+                line_number += 1
+        
+        # Si quedan paréntesis sin cerrar, reportar error específico
+        if parenthesis_stack:
+            paren_char, paren_line = parenthesis_stack[0]
+            error_msg = f"Error sintáctico en línea {paren_line}: Paréntesis sin cerrar '(' que no tiene su correspondiente ')'"
+            
+            # Encontrar la línea con el paréntesis sin cerrar
+            line = code.split('\n')[paren_line - 1]
+            
+            # Agregar contexto al error
+            response["success"] = False
+            response["phase"] = "syntactic"
+            response["errors"].append(error_msg)
+            response["errors"].append(f"En el código:\n    {line}\n    ^ Falta el paréntesis de cierre")
+            response["output"].append("❌ Error sintáctico encontrado:")
+            response["output"].append(error_msg)
+            return response
+        
         # Fase 1: Análisis Léxico
         lexer = PLYLexer(code)
         

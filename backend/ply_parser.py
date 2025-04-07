@@ -365,7 +365,8 @@ class PLYParser:
         '''primary_expression : literal
                              | ID
                              | call
-                             | group'''
+                             | group
+                             | list_literal'''
         if isinstance(p[1], str):  # ID
             p[0] = Identifier(p[1])
         else:
@@ -457,6 +458,22 @@ Ejemplo correcto: {func_name}(5) o {func_name}(5, 10)"""
     def p_empty(self, p):
         '''empty :'''
         pass
+    
+    def p_list_literal(self, p):
+        '''list_literal : LBRACKET list_items RBRACKET
+                       | LBRACKET RBRACKET'''
+        if len(p) == 4:
+            p[0] = Literal(value=p[2], type_name='list')
+        else:
+            p[0] = Literal(value=[], type_name='list')
+    
+    def p_list_items(self, p):
+        '''list_items : expression
+                      | list_items COMMA expression'''
+        if len(p) == 2:
+            p[0] = [p[1]]
+        else:
+            p[0] = p[1] + [p[3]]
     
     def p_error(self, p):
         if p is None:
