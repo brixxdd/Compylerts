@@ -80,10 +80,21 @@ class PLYLexer:
     # Reglas para corchetes (ahora correctamente indentadas dentro de la clase)
     def t_LBRACKET(self, t):
         r'\['
+        # Guardar posición y línea del corchete abierto
+        self.bracket_stack.append((t.lexer.lineno, t.lexpos))
         return t
 
     def t_RBRACKET(self, t):
         r'\]'
+        if not self.bracket_stack:
+            line = self.source_lines[t.lexer.lineno - 1]
+            column = t.lexpos - sum(len(l) + 1 for l in self.source_lines[:t.lexer.lineno - 1])
+            self.errors.append(f"""Error sintáctico en línea {t.lexer.lineno}: Corchete de cierre sin coincidencia
+En el código:
+    {line}
+    {' ' * column}^ No hay un corchete de apertura '[' correspondiente""")
+        else:
+            self.bracket_stack.pop()
         return t
 
     # Ignorar espacios y tabs (excepto para indentación)
@@ -101,7 +112,8 @@ class PLYLexer:
         # Variables para manejar indentación
         self.indent_stack = [0]
         self.tokens_queue = []
-        self.paren_stack = []  # Nueva pila para rastrear paréntesis
+        self.paren_stack = []  # Pila para rastrear paréntesis
+        self.bracket_stack = []  # Nueva pila para rastrear corchetes
     
     def t_ID(self, t):
         r'[a-zA-Z_][a-zA-Z0-9_]*'
@@ -221,11 +233,11 @@ En el código:
             tok.lexpos = 0
             return tok
         
-        # Si no hay más tokens en el input, verificar paréntesis sin cerrar
+        # Si no hay más tokens en el input, verificar paréntesis y corchetes sin cerrar
         tok = self.lexer.token()
         if not tok:
+            # Verificar paréntesis sin cerrar
             if self.paren_stack:
-                # Estandarizar como error sintáctico
                 for line_no, pos in self.paren_stack:
                     if 0 <= line_no - 1 < len(self.source_lines):
                         line = self.source_lines[line_no - 1]
@@ -235,6 +247,19 @@ En el código:
     {line}
     {' ' * column}^ Falta el paréntesis de cierre ')'
 Sugerencia: {line[:column+1]})""")
+                    
+            # Verificar corchetes sin cerrar
+            if self.bracket_stack:
+                for line_no, pos in self.bracket_stack:
+                    if 0 <= line_no - 1 < len(self.source_lines):
+                        line = self.source_lines[line_no - 1]
+                        column = pos - sum(len(l) + 1 for l in self.source_lines[:line_no - 1])
+                        self.errors.append(f"""Error sintáctico en línea {line_no}: Corchete sin cerrar
+En el código:
+    {line}
+    {' ' * column}^ Falta el corchete de cierre ']'
+Sugerencia: {line}]""")
+                    
             if self.indent_stack[-1] > 0:
                 while len(self.indent_stack) > 1:
                     self.indent_stack.pop()

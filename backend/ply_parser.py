@@ -47,15 +47,18 @@ class PLYParser:
             # Verificar errores léxicos
             if self.lexer.errors:
                 self.errors.extend(self.lexer.errors)
-                return None
+                # Continuar con el análisis incluso con errores léxicos
             
             # Realizar análisis sintáctico
             ast = self.parser.parse(lexer=self.lexer)
             
-            # Verificar errores semánticos
-            if self.semantic_errors:
-                self.errors.extend(self.semantic_errors)
-                return None
+            # Evitar duplicación de errores semánticos
+            unique_semantic_errors = []
+            for err in self.semantic_errors:
+                if err not in unique_semantic_errors:
+                    unique_semantic_errors.append(err)
+            
+            self.semantic_errors = unique_semantic_errors
             
             return ast
         except Exception as e:
@@ -135,11 +138,12 @@ class PLYParser:
     def _check_function_call(self, call_expr, line):
         """Verifica una llamada a función"""
         func_name = call_expr.callee.name
+        error_msg = f"Error semántico en línea {line}: Función '{func_name}' no está definida"
+        
         if not self.symbol_table.resolve(func_name) and func_name not in ['print', 'input', 'len']:
-            self.semantic_errors.append(
-                f"Error semántico en línea {line}: "
-                f"Función '{func_name}' no está definida"
-            )
+            # Verificar si este error ya ha sido reportado
+            if error_msg not in self.semantic_errors:
+                self.semantic_errors.append(error_msg)
     
     def _check_variable_reference(self, identifier, line):
         """Verifica una referencia a variable"""
