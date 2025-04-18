@@ -76,7 +76,7 @@ class PLYLexer:
     t_GE = r'>='
     t_COLON = r':'
     t_ASSIGN = r'='
-
+    
     # Ignorar espacios y tabs (excepto para indentación)
     t_ignore = ' \t'
     
@@ -140,17 +140,7 @@ En el código:
     
     def t_STRING(self, t):
         r'\"[^\"]*\"|\'[^\']*\''
-        if not (t.value.startswith('"') and t.value.endswith('"')) or \
-           not (t.value.startswith("'") and t.value.endswith("'")):
-            line = self.source_lines[t.lexer.lineno - 1]
-            column = t.lexpos - sum(len(l) + 1 for l in self.source_lines[:t.lexer.lineno - 1])
-            self.errors.append(f"""Error léxico en línea {t.lexer.lineno}: Cadena sin cerrar
-En el código:
-    {line}
-    {' ' * column}^ Aquí""")
-            self.valid_code = False
-            return None
-        t.value = t.value[1:-1]  # Quitar las comillas
+        t.value = t.value[1:-1]  # Eliminar las comillas
         return t
     
     def t_NEWLINE(self, t):
@@ -257,30 +247,39 @@ Sugerencia: {line}]""")
 
     def t_COMMA(self, t):
         r','
-        # Verificar si hay un paréntesis de cierre después de la coma
-        pos = t.lexpos + 1
-        while pos < len(t.lexer.lexdata) and t.lexer.lexdata[pos] in ' \t':
-            pos += 1
-        
-        if pos < len(t.lexer.lexdata) and t.lexer.lexdata[pos] == ')':
-            # Es una coma seguida de paréntesis
+        return t
+
+    def t_LPAREN(self, t):
+        r'\('
+        self.paren_stack.append((t.lexer.lineno, t.lexpos))
+        return t
+
+    def t_RPAREN(self, t):
+        r'\)'
+        if not self.paren_stack:
             line = self.source_lines[t.lexer.lineno - 1]
-            # Encontrar el nombre de la función
-            func_name = line[:line.find('(')].strip()
-            if '=' in func_name:
-                func_name = func_name.split('=')[1].strip()
-            
-            # Calcular la posición exacta de la coma
-            column = line.find(',')
-            
-            error_msg = f"""Error léxico en línea {t.lexer.lineno}: Argumento faltante después de la coma
+            column = t.lexpos - sum(len(l) + 1 for l in self.source_lines[:t.lexer.lineno - 1])
+            self.errors.append(f"Error léxico en línea {t.lexer.lineno}: Paréntesis de cierre sin coincidencia")
+        else:
+            self.paren_stack.pop()
+        return t
+
+    def t_LBRACKET(self, t):
+        r'\['
+        self.bracket_stack.append((t.lexer.lineno, t.lexpos))
+        return t
+
+    def t_RBRACKET(self, t):
+        r'\]'
+        if not self.bracket_stack:
+            line = self.source_lines[t.lexer.lineno - 1]
+            column = t.lexpos - sum(len(l) + 1 for l in self.source_lines[:t.lexer.lineno - 1])
+            self.errors.append(f"""Error sintáctico en línea {t.lexer.lineno}: Corchete de cierre sin coincidencia
 En el código:
     {line}
-    {' ' * column}^ No se permite una coma al final sin un argumento
-Sugerencia: La función '{func_name}' espera otro argumento después de la coma
-Ejemplo correcto: {func_name}(5, 10)"""
-            self.errors.append(error_msg)
-            self.valid_code = False
+    {' ' * column}^ No hay un corchete de apertura correspondiente""")
+        else:
+            self.bracket_stack.pop()
         return t
 
     def parse(self, text):
@@ -311,19 +310,3 @@ Ejemplo correcto: {func_name}(5, 10)"""
         except Exception as e:
             self.errors.append(f"Error inesperado: {str(e)}")
             return None
-
-    def t_LPAREN(self, t):
-        r'\('
-        # Guarda posición y línea del paréntesis abierto
-        self.paren_stack.append((t.lexer.lineno, t.lexpos))
-        return t
-
-    def t_RPAREN(self, t):
-        r'\)'
-        if not self.paren_stack:
-            line = self.source_lines[t.lexer.lineno - 1]
-            column = t.lexpos - sum(len(l) + 1 for l in self.source_lines[:t.lexer.lineno - 1])
-            self.errors.append(f"Error léxico en línea {t.lexer.lineno}: Paréntesis de cierre sin coincidencia")
-        else:
-            self.paren_stack.pop()
-        return t

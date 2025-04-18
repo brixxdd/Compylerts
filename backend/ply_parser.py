@@ -10,10 +10,10 @@ from symbol_table import SymbolTable, Symbol, Scope
 
 class PLYParser:
     """Parser sintáctico basado en PLY para el compilador Python -> TypeScript"""
-
+    
     # Obtener tokens del lexer
     tokens = PLYLexer.tokens
-
+    
     # Definir precedencia de operadores
     precedence = (
         ('left', 'EQ', 'NE'),
@@ -22,18 +22,18 @@ class PLYParser:
         ('left', 'TIMES', 'DIVIDE', 'MOD'),
         ('right', 'UMINUS'),  # Para el operador unario -
     )
-
+    
     def __init__(self):
         self.parser = yacc.yacc(module=self, debug=False)
         self.errors = []
         self.source_lines = []
         self.user_defined_functions = set()  # Para rastrear funciones definidas por el usuario
-        self.known_functions = known_functions
+        self.known_functions = ['print', 'input', 'len']  # Asegurarse que print esté aquí
         self.lexer = None
         self.valid_code = True  # Asumimos que el código es válido hasta que se demuestre lo contrario
         self.symbol_table = SymbolTable()
         self.semantic_errors = []
-
+    
     # ======================================================================
     # REGLAS BNF PARA EL LENGUAJE
     # ======================================================================
@@ -63,7 +63,7 @@ class PLYParser:
                 elif isinstance(stmt, Identifier):
                     self._check_variable_reference(stmt, p.lineno)
         p[0] = Program(p[1] if p[1] else [])
-
+    
     # <statement_list> ::= <statement> | <statement_list> <statement>
     def p_statement_list(self, p):
         '''statement_list : statement
@@ -77,13 +77,13 @@ class PLYParser:
                 p[0] = p[1] + [p[2]]
             else:
                 p[0] = p[1]
-
+    
     # <statement> ::= <simple_statement> | <compound_statement>
     def p_statement(self, p):
         '''statement : simple_statement
                     | compound_statement'''
         p[0] = p[1]
-
+    
     # <simple_statement> ::= <expression_statement> | <assignment_statement> | <return_statement> | NEWLINE
     def p_simple_statement(self, p):
         '''simple_statement : expression_statement
@@ -94,7 +94,7 @@ class PLYParser:
             p[0] = None
         else:
             p[0] = p[1]
-
+    
     # <expression_statement> ::= <expression> NEWLINE
     def p_expression_statement(self, p):
         '''expression_statement : expression NEWLINE'''
@@ -111,23 +111,25 @@ class PLYParser:
                             f"Variable '{arg.name}' no está definida"
                         )
         p[0] = ExpressionStmt(expr)
-
+    
     # <assignment_statement> ::= ID ASSIGN <expression> NEWLINE
     def p_assignment_statement(self, p):
-        '''assignment_statement : ID ASSIGN expression NEWLINE'''
+        '''assignment_statement : ID ASSIGN expression NEWLINE
+                               | ID ASSIGN list_literal NEWLINE'''
         name = p[1]
         value = p[3]
-        # Si estamos en el ámbito global, crear una variable global
-        if self.symbol_table.current_scope == self.symbol_table.global_scope:
-            symbol = Symbol(name=name, type='any', kind='variable')
-            self.symbol_table.define(symbol)
-        else:
-            # Verificar si la variable existe en algún ámbito
-            if not self.symbol_table.resolve(name):
-                symbol = Symbol(name=name, type='any', kind='variable')
-                self.symbol_table.define(symbol)
+        
+        # Crear variable en la tabla de símbolos
+        # Detectar tipo según el valor si es posible
+        var_type = 'any'
+        if isinstance(value, Literal):
+            var_type = value.type_name
+        
+        symbol = Symbol(name=name, type=var_type, kind='variable')
+        self.symbol_table.define(symbol)
+        
         p[0] = AssignmentStmt(Identifier(name), value)
-
+    
     # <return_statement> ::= KEYWORD <expression> NEWLINE | KEYWORD NEWLINE
     def p_return_statement(self, p):
         '''return_statement : KEYWORD expression NEWLINE
@@ -137,14 +139,14 @@ class PLYParser:
                 p[0] = ReturnStmt(p[2])
             else:
                 p[0] = ReturnStmt(None)
-
+    
     # <compound_statement> ::= <function_def> | <if_statement> | <for_statement>
     def p_compound_statement(self, p):
         '''compound_statement : function_def
                              | if_statement
                              | for_statement'''
         p[0] = p[1]
-
+    
     # <function_def> ::= KEYWORD ID LPAREN <parameter_list> RPAREN <return_type> COLON NEWLINE INDENT <statement_list> DEDENT
     def p_function_def(self, p):
         '''function_def : KEYWORD ID LPAREN parameter_list RPAREN return_type COLON NEWLINE INDENT statement_list DEDENT'''
@@ -175,7 +177,7 @@ class PLYParser:
             )
             self.symbol_table.define(func_symbol)
             p[0] = FunctionDef(name, params, return_type, body)
-
+    
     # <parameter_list> ::= <parameter> | <parameter_list> COMMA <parameter>
     def p_parameter_list(self, p):
         '''parameter_list : parameter
@@ -184,7 +186,7 @@ class PLYParser:
             p[0] = [p[1]]
         else:
             p[0] = p[1] + [p[3]]
-
+    
     def p_parameter(self, p):
         '''parameter : ID COLON ID
                     | ID'''
@@ -202,7 +204,7 @@ class PLYParser:
             p[0] = Parameter(p[1], Type(type_name))
         else:
             p[0] = Parameter(p[1], None)
-
+    
     # <type> ::= ID
     def p_type(self, p):
         '''type : ID'''
@@ -217,7 +219,7 @@ class PLYParser:
         }
         type_name = type_mapping.get(p[1], p[1])
         p[0] = Type(type_name)
-
+    
     # <if_statement> ::= KEYWORD <expression> COLON NEWLINE INDENT <statement_list> DEDENT
     #                  | KEYWORD <expression> COLON NEWLINE INDENT <statement_list> DEDENT KEYWORD COLON NEWLINE INDENT <statement_list> DEDENT
     def p_if_statement(self, p):
@@ -226,14 +228,17 @@ class PLYParser:
         if p[1] == 'if':
             condition = p[2]
             then_branch = p[6]
+            else_branch = None
+            
             # Verificar si hay una rama else
-            if len(p) > 8 and p[8] == 'else':
-                else_branch = p[12]
-            else:
-                else_branch = None
+            if len(p) > 8:
+                # Asegurarnos de que es un else y tiene los dos puntos
+                if p[8] == 'else':
+                    else_branch = p[12]
+            
             p[0] = IfStmt(condition, then_branch, else_branch)
-
-    # <for_statement> ::= KEYWORD ID KEYWORD expression COLON NEWLINE INDENT statement_list DEDENT
+    
+    # <for_statement> ::= KEYWORD ID KEYWORD expression COLON NEWLINE INDENT <statement_list> DEDENT
     def p_for_statement(self, p):
         '''for_statement : KEYWORD ID KEYWORD expression COLON NEWLINE INDENT statement_list DEDENT'''
         if p[1] == 'for' and p[3] == 'in':
@@ -242,11 +247,17 @@ class PLYParser:
             body = p[8]
             p[0] = ForStmt(variable, iterable, body)
 
-    # <expression> ::= <binary_expression>
+    # <expression> ::= <binary_expression> | <primary_expression> | NUMBER | <list_literal>
     def p_expression(self, p):
-        '''expression : binary_expression'''
-        p[0] = p[1]
-
+        '''expression : binary_expression
+                     | primary_expression
+                     | NUMBER
+                     | list_literal'''
+        if isinstance(p[1], (int, float)):
+            p[0] = Literal(value=p[1], type_name='number')
+        else:
+            p[0] = p[1]
+    
     # <binary_expression> ::= <unary_expression> | <binary_expression> PLUS <unary_expression> | ...
     def p_binary_expression(self, p):
         '''binary_expression : unary_expression
@@ -279,7 +290,7 @@ class PLYParser:
                 '>=': BinaryOp.GREATER_EQUAL
             }
             p[0] = BinaryExpr(p[1], op_mapping[p[2]], p[3])
-
+    
     # <unary_expression> ::= <primary_expression> | MINUS <unary_expression> %prec UMINUS
     def p_unary_expression(self, p):
         '''unary_expression : primary_expression
@@ -288,7 +299,7 @@ class PLYParser:
             p[0] = p[1]
         else:
             p[0] = UnaryExpr(UnaryOp.NEGATE, p[2])
-
+    
     # <primary_expression> ::= <literal> | ID | <call> | <group> | <list_literal>
     def p_primary_expression(self, p):
         '''primary_expression : literal
@@ -300,7 +311,7 @@ class PLYParser:
             p[0] = Identifier(p[1])
         else:
             p[0] = p[1]
-
+    
     # <literal> ::= NUMBER | STRING
     def p_literal(self, p):
         '''literal : NUMBER
@@ -315,97 +326,104 @@ class PLYParser:
                 p[0] = Literal(value=None, type_name='null')
             else:  # String normal
                 p[0] = Literal(value=p[1], type_name='string')
-
+    
     # <group> ::= LPAREN <expression> RPAREN
     def p_group(self, p):
         '''group : LPAREN expression RPAREN'''
         p[0] = GroupingExpr(p[2])
-
+    
     # <call> ::= ID LPAREN <arguments> RPAREN | ID LPAREN RPAREN
     def p_call(self, p):
         '''call : ID LPAREN arguments RPAREN
                 | ID LPAREN RPAREN'''
         func_name = p[1]
         args = [] if len(p) == 4 else p[3]
+        
+        # Manejo especial para funciones built-in como print
+        if func_name in ['print', 'input', 'len']:
+            p[0] = CallExpr(Identifier(func_name), args)
+            return
+        
         # Verificar si la función existe y el número de argumentos
         symbol = self.symbol_table.resolve(func_name)
         if not symbol:
-            if func_name not in ['print', 'input', 'len']:  # Funciones built-in
-                self.semantic_errors.append(
-                    f"Error semántico en línea {p.lexer.lineno}: "  # Usar p.lexer.lineno
-                    f"Función '{func_name}' no está definida"
-                )
+            self.semantic_errors.append(
+                f"Error semántico en línea {p.lexer.lineno}: "
+                f"Función '{func_name}' no está definida"
+            )
             p[0] = CallExpr(Identifier(func_name), args)
             return
+        
         if symbol.kind != 'function':
             self.semantic_errors.append(
-                f"Error semántico en línea {p.lexer.lineno}: "  # Usar p.lexer.lineno
+                f"Error semántico en línea {p.lexer.lineno}: "
                 f"'{func_name}' no es una función"
             )
             p[0] = CallExpr(Identifier(func_name), args)
             return
-        expected_args = len(symbol.parameters) if symbol.parameters else 0
-        received_args = len(args)
-        if expected_args != received_args:
-            self.semantic_errors.append(
-                f"Error semántico en línea {p.lexer.lineno}: "  # Usar p.lexer.lineno
-                f"La función '{func_name}' espera {expected_args} argumentos "
-                f"pero recibió {received_args}"
-            )
+        
+        # No verificar número de argumentos para print
+        if func_name != 'print':
+            expected_args = len(symbol.parameters) if symbol.parameters else 0
+            received_args = len(args)
+            if expected_args != received_args:
+                self.semantic_errors.append(
+                    f"Error semántico en línea {p.lexer.lineno}: "
+                    f"La función '{func_name}' espera {expected_args} argumentos "
+                    f"pero recibió {received_args}"
+                )
+        
         p[0] = CallExpr(Identifier(func_name), args)
-
+    
     # <arguments> ::= <expression> | <arguments> COMMA <expression>
     def p_arguments(self, p):
         '''arguments : expression
+                     | STRING
                      | arguments COMMA expression
-                     | error COMMA
-                     | arguments COMMA error'''
+                     | arguments COMMA STRING'''
         if len(p) == 2:
-            p[0] = [p[1]]
-        elif len(p) == 4 and p[2] == ',' and p[3] == 'error':
-            # Error: coma al final sin argumento
-            func_name = self.source_lines[p.lineno - 1][:self.source_lines[p.lineno - 1].find('(')].strip()
-            error_msg = f"""Error sintáctico en línea {p.lineno}: Argumento faltante después de la coma
-En el código:
-    {self.source_lines[p.lineno - 1]}
-    {' ' * (self.source_lines[p.lineno - 1].rfind(',') + 1)}^ No se permite una coma al final sin un argumento
-Sugerencia: Elimina la coma o agrega el argumento faltante
-Ejemplo correcto: {func_name}(5) o {func_name}(5, 10)"""
-            self.errors.append(error_msg)
-            p[0] = None
+            # Si es una expresión o string simple
+            if isinstance(p[1], str):
+                p[0] = [Literal(p[1], 'string')]
+            else:
+                p[0] = [p[1]]
         else:
-            p[0] = p[1] + [p[3]]
-
+            # Si es una lista de argumentos con coma
+            if isinstance(p[3], str):
+                p[0] = p[1] + [Literal(p[3], 'string')]
+            else:
+                p[0] = p[1] + [p[3]]
+    
     # <return_type> ::= ARROW TYPE | empty
     def p_return_type(self, p):
         '''return_type : ARROW ID
-                      | empty'''
+                          | empty'''
         if len(p) > 2:
             p[0] = Type(p[2])
         else:
             p[0] = None
-
+    
     # <empty> ::=
     def p_empty(self, p):
         '''empty :'''
         pass
-
+    
     # <list_literal> ::= LBRACKET <list_items> RBRACKET | LBRACKET RBRACKET
     def p_list_literal(self, p):
-        '''list_literal : LBRACKET list_items RBRACKET
-                       | LBRACKET RBRACKET'''
-        if len(p) == 4:
-            p[0] = Literal(value=p[2], type_name='list')
-        else:
-            p[0] = Literal(value=[], type_name='list')
+        '''list_literal : LBRACKET list_items RBRACKET'''
+        p[0] = Literal(value=p[2] if p[2] else [], type_name='list')
 
     # <list_items> ::= <expression> | <list_items> COMMA <expression>
     def p_list_items(self, p):
         '''list_items : expression
-                      | list_items COMMA expression'''
+                      | list_items COMMA expression
+                      | empty'''
         if len(p) == 2:
-            p[0] = [p[1]]
-        else:
+            if p[1] is None:  # empty
+                p[0] = []
+            else:
+                p[0] = [p[1]]
+        elif len(p) == 4:
             p[0] = p[1] + [p[3]]
 
     # Manejo de errores
@@ -414,34 +432,59 @@ Ejemplo correcto: {func_name}(5) o {func_name}(5, 10)"""
             error_msg = "Error sintáctico: Final inesperado del archivo"
             self.errors.append(error_msg)
             return
+        
         # Obtener la línea completa donde está el error
         line = self.source_lines[p.lineno - 1]
         column = p.lexpos - sum(len(l) + 1 for l in self.source_lines[:p.lineno - 1])
-        # Verificar si es un error común
-        if p.type == 'ID' and p.value == 'retun':
-            error_msg = f"""Error sintáctico en línea {p.lineno}: Error tipográfico '{p.value}'
+        
+        # Mensaje de error más descriptivo según el tipo de token
+        if p.type == 'COMMA':
+            error_msg = f"""Error sintáctico en línea {p.lineno}: Coma inesperada
 En el código:
     {line}
-    {' ' * column}^ '¿Quisiste decir 'return'?"
-Sugerencia: {line.replace('retun', 'return')}"""
-            self.errors.append(error_msg)
+    {' ' * column}^ Verifica que los argumentos estén correctamente separados"""
         else:
-            # Mensaje genérico para otros errores sintácticos
             error_msg = f"""Error sintáctico en línea {p.lineno}: Token inesperado '{p.value}'
 En el código:
     {line}
     {' ' * column}^ Aquí"""
-            self.errors.append(error_msg)
-        # Intentar recuperarse del error y continuar
-        # Más agresivamente que antes
-        parser = self.parser
+        
+        self.errors.append(error_msg)
+        
+        # Mejorar la recuperación de errores
+        # 1. Guardar el token actual para referencia
+        error_token = p
+
+        # 2. Intentar sincronizar hasta el siguiente punto seguro
         while True:
-            # Obtener el siguiente token
-            tok = parser.token()
-            if not tok or tok.type in ['NEWLINE', 'DEDENT', 'KEYWORD']:
+            try:
+                # Obtener el siguiente token
+                tok = self.parser.token()
+                if not tok:
+                    break
+                
+                # Lista de tokens que indican el final de una declaración
+                sync_tokens = ['NEWLINE', 'DEDENT']
+                
+                # Si encontramos un token de sincronización, intentar continuar desde ahí
+                if tok.type in sync_tokens:
+                    # Restaurar el estado del parser
+                    self.parser.restart()
+                    return tok
+
+                # Si encontramos el inicio de una nueva declaración, también es un buen punto para continuar
+                if tok.type == 'KEYWORD' and tok.value in ['def', 'if', 'else', 'for', 'while']:
+                    # Restaurar el estado del parser
+                    self.parser.restart()
+                    return tok
+
+            except Exception:
                 break
-        # Intentar sincronizarse con NEWLINE o KEYWORD de inicio de bloque
-        parser.errok()
+
+        # Si llegamos aquí, no pudimos recuperarnos
+        # Al menos intentamos sincronizar con el siguiente token válido
+        self.parser.errok()
+        return None
 
     def parse(self, text):
         """Analiza el texto y construye el AST"""
@@ -456,18 +499,18 @@ En el código:
             if self.lexer.errors:
                 self.errors.extend(self.lexer.errors)
             
-            ast = self.parser.parse(lexer=self.lexer)
+            # Desactivar el modo debug del parser
+            ast = self.parser.parse(lexer=self.lexer, debug=False)  # Cambiar debug=True a debug=False
             
-            print("\n=== AST Generated ===")
-            print_ast(ast)
-            print("===================\n")
+            # Solo mostrar el AST si no hay errores sintácticos
+            if not self.errors:
+                print("\n=== AST Generated ===")
+                print_ast(ast)
+                print("===================\n")
             
-            unique_semantic_errors = []
-            for err in self.semantic_errors:
-                if err not in unique_semantic_errors:
-                    unique_semantic_errors.append(err)
-            
-            self.semantic_errors = unique_semantic_errors
+            # Eliminar errores duplicados manteniendo el orden
+            seen = set()
+            self.errors = [x for x in self.errors if not (x in seen or seen.add(x))]
             
             return ast
         except Exception as e:
@@ -484,6 +527,11 @@ En el código:
             # Verificar si este error ya ha sido reportado
             if error_msg not in self.semantic_errors:
                 self.semantic_errors.append(error_msg)
+
+    # Añadir una función de ayuda para la depuración
+    def debug_production(self, p, rule_name):
+        """Ayuda a depurar las producciones"""
+        print(f"Debug - Regla {rule_name}: Tokens = {[str(x) for x in p[1:]]}")
 
 def print_ast(node, indent=0):
     """Imprime el AST de forma legible"""

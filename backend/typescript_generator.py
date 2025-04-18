@@ -76,12 +76,28 @@ class TypeScriptGenerator:
         self.emit("}")
 
     def visit_assignment_stmt(self, node):
+        """Genera código para asignaciones"""
         value = self.visit_expression(node.value)
         type_annotation = ''
         
-        if hasattr(node, 'type') and node.type:
-            type_annotation = f": {self.type_mapping.get(node.type.name, 'any')}"
+        # Inferir tipo si es posible
+        inferred_type = ''
+        if isinstance(node.value, Literal):
+            if node.value.type_name == 'number':
+                inferred_type = 'number'
+            elif node.value.type_name == 'string':
+                inferred_type = 'string'
+            elif node.value.type_name == 'boolean':
+                inferred_type = 'boolean'
+            elif node.value.type_name == 'list':
+                inferred_type = 'any[]'  # Usar any[] como tipo por defecto para listas
         
+        if hasattr(node, 'type') and node.type:
+            type_annotation = f": {self.type_mapping.get(node.type.name, inferred_type or 'any')}"
+        elif inferred_type:
+            type_annotation = f": {inferred_type}"
+        
+        # Usar let para todas las asignaciones (podría refinarse para const si el valor no cambia)
         self.emit(f"let {node.target.name}{type_annotation} = {value};")
 
     def visit_return_stmt(self, node):
@@ -115,6 +131,17 @@ class TypeScriptGenerator:
         return node.name
 
     def visit_literal(self, node):
+        """Genera código para literales, incluyendo listas"""
+        if node.type_name == 'list':
+            # Si el valor es una lista de nodos, necesitamos procesarlos
+            if hasattr(node.value, '__iter__') and not isinstance(node.value, str):
+                elements = [self.visit_expression(item) for item in node.value]
+                return f"[{', '.join(elements)}]"
+            return str(node.value)
+        elif node.type_name == 'boolean':
+            return str(node.value).lower()  # 'True' -> 'true', 'False' -> 'false'
+        elif node.type_name == 'null':
+            return 'null'
         return str(node.value)
 
     def transform_python_builtin(self, func_name: str, args: List[str]) -> str:

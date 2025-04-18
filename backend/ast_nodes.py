@@ -232,3 +232,15 @@ class Parameter(ASTNode):
 class Type(ASTNode):
     def __init__(self, name):
         self.name = name 
+
+def p_arguments(self, p):
+    '''arguments : expression
+                | arguments COMMA expression
+                | STRING
+                | arguments COMMA STRING'''
+    if len(p) == 2:
+        # Si es una expresión o string simple
+        p[0] = [p[1] if isinstance(p[1], Literal) else Literal(p[1], 'string' if isinstance(p[1], str) else 'any')]
+    else:
+        # Si es una lista de argumentos con coma
+        p[0] = p[1] + [p[3] if isinstance(p[3], Literal) else Literal(p[3], 'string' if isinstance(p[3], str) else 'any')] 
