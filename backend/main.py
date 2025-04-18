@@ -1,14 +1,31 @@
 import sys
 from ply_lexer import PLYLexer
 from ply_parser import PLYParser
+from typescript_generator import TypeScriptGenerator
 from colorama import init, Fore, Style
 
 # Inicializar colorama para salida con color
 init()
 
+def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
+    """Compila código Python a TypeScript"""
+    # Análisis léxico y sintáctico
+    lexer = PLYLexer(source_code)
+    parser = PLYParser()
+    ast = parser.parse(source_code)
+    
+    if parser.errors or parser.semantic_errors:
+        return None, parser.errors + parser.semantic_errors
+    
+    # Generación de código TypeScript
+    generator = TypeScriptGenerator()
+    typescript_code = generator.generate(ast)
+    
+    return typescript_code, []
+
 def main():
-    print("=== Análisis Léxico y Sintáctico con PLY ===")
-    print("Ingresa tu código (presiona Ctrl+D en Linux/Mac o Ctrl+Z en Windows para finalizar):")
+    print("=== Compilador Python a TypeScript ===")
+    print("Ingresa tu código Python (presiona Ctrl+D en Linux/Mac o Ctrl+Z en Windows para finalizar):")
     print("-" * 80)
     
     # Leer código fuente
@@ -21,46 +38,21 @@ def main():
         pass
     
     try:
-        # Crear instancia del lexer y parser
-        lexer = PLYLexer(source_code)
-        parser = PLYParser()
+        # Compilar el código a TypeScript
+        typescript_code, errors = compile_to_typescript(source_code)
         
-        # Realizar el análisis léxico
-        print("\nTokens encontrados:")
-        print("-" * 40)
-        tokens_found = []
-        while True:
-            tok = lexer.token()
-            if not tok:
-                break
-            tokens_found.append(f"{tok.type}: {tok.value}")
-        
-        # Mostrar tokens encontrados
-        for token in tokens_found:
-            print(token)
-        
-        # Verificar errores léxicos
-        if lexer.errors:
-            print("\n❌ Errores léxicos:")
-            for error in lexer.errors:
-                print(f"{Fore.RED}{error}{Style.RESET_ALL}")
-            return
-        
-        # Realizar análisis sintáctico y semántico
-        result = parser.parse(source_code)
-        
-        # Mostrar errores sintácticos y semánticos
-        if parser.errors:
+        if errors:
             print("\n❌ Errores encontrados:")
-            for error in parser.errors:
-                print(f"{Fore.RED}{error}{Style.RESET_ALL}")
-        elif parser.semantic_errors:
-            print("\n❌ Errores semánticos:")
-            for error in parser.semantic_errors:
-                print(f"{Fore.YELLOW}{error}{Style.RESET_ALL}")
+            for error in errors:
+                if "Error semántico" in error:
+                    print(f"{Fore.YELLOW}{error}{Style.RESET_ALL}")
+                else:
+                    print(f"{Fore.RED}{error}{Style.RESET_ALL}")
         else:
-            print("\n✅ No se encontraron errores")
-            print("✅ Análisis completado sin errores")
+            print("\n✅ Compilación exitosa")
+            print("\nCódigo TypeScript generado:")
+            print("-" * 40)
+            print(typescript_code)
             
     except Exception as e:
         print(f"\n❌ Error inesperado: {str(e)}")

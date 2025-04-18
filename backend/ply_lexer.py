@@ -43,10 +43,10 @@ tokens = (
     'PLUS', 'MINUS', 'TIMES', 'DIVIDE', 'MOD',
     'EQ', 'NE', 'LT', 'GT', 'LE', 'GE',
     'LPAREN', 'RPAREN', 
-    'LBRACKET', 'RBRACKET',  # Nuevos tokens para corchetes
+    'LBRACKET', 'RBRACKET',
     'COMMA', 'COLON',
     'ASSIGN', 'NEWLINE', 'INDENT', 'DEDENT',
-    'KEYWORD', 'ARROW', 'TRAILING_COMMA'
+    'KEYWORD', 'ARROW'
 )
 
 class PLYLexer:
@@ -76,26 +76,6 @@ class PLYLexer:
     t_GE = r'>='
     t_COLON = r':'
     t_ASSIGN = r'='
-    
-    # Reglas para corchetes (ahora correctamente indentadas dentro de la clase)
-    def t_LBRACKET(self, t):
-        r'\['
-        # Guardar posición y línea del corchete abierto
-        self.bracket_stack.append((t.lexer.lineno, t.lexpos))
-        return t
-
-    def t_RBRACKET(self, t):
-        r'\]'
-        if not self.bracket_stack:
-            line = self.source_lines[t.lexer.lineno - 1]
-            column = t.lexpos - sum(len(l) + 1 for l in self.source_lines[:t.lexer.lineno - 1])
-            self.errors.append(f"""Error sintáctico en línea {t.lexer.lineno}: Corchete de cierre sin coincidencia
-En el código:
-    {line}
-    {' ' * column}^ No hay un corchete de apertura '[' correspondiente""")
-        else:
-            self.bracket_stack.pop()
-        return t
 
     # Ignorar espacios y tabs (excepto para indentación)
     t_ignore = ' \t'
