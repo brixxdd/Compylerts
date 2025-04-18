@@ -3,7 +3,7 @@ from ply_lexer import PLYLexer, known_functions
 from ast_nodes import (
     Program, ExpressionStmt, AssignmentStmt, ReturnStmt, FunctionDef, IfStmt,
     BinaryExpr, UnaryExpr, GroupingExpr, Literal, Identifier, CallExpr,
-    Parameter, Type, BinaryOp, UnaryOp
+    Parameter, Type, BinaryOp, UnaryOp, ForStmt
 )
 import re
 from symbol_table import SymbolTable, Symbol, Scope
@@ -138,10 +138,11 @@ class PLYParser:
             else:
                 p[0] = ReturnStmt(None)
 
-    # <compound_statement> ::= <function_def> | <if_statement>
+    # <compound_statement> ::= <function_def> | <if_statement> | <for_statement>
     def p_compound_statement(self, p):
         '''compound_statement : function_def
-                             | if_statement'''
+                             | if_statement
+                             | for_statement'''
         p[0] = p[1]
 
     # <function_def> ::= KEYWORD ID LPAREN <parameter_list> RPAREN <return_type> COLON NEWLINE INDENT <statement_list> DEDENT
@@ -231,6 +232,15 @@ class PLYParser:
             else:
                 else_branch = None
             p[0] = IfStmt(condition, then_branch, else_branch)
+
+    # <for_statement> ::= KEYWORD ID KEYWORD expression COLON NEWLINE INDENT statement_list DEDENT
+    def p_for_statement(self, p):
+        '''for_statement : KEYWORD ID KEYWORD expression COLON NEWLINE INDENT statement_list DEDENT'''
+        if p[1] == 'for' and p[3] == 'in':
+            variable = Identifier(p[2])
+            iterable = p[4]
+            body = p[8]
+            p[0] = ForStmt(variable, iterable, body)
 
     # <expression> ::= <binary_expression>
     def p_expression(self, p):

@@ -11,9 +11,10 @@ class TypeScriptGenerator:
             'str': 'string',
             'float': 'number',
             'bool': 'boolean',
-            'list': 'Array',
-            'dict': 'Record',
-            'None': 'void'
+            'list': 'Array<any>',
+            'dict': 'Record<string, any>',
+            'None': 'void',
+            'any': 'any'
         }
 
     def generate(self, ast: Program) -> str:
@@ -43,7 +44,16 @@ class TypeScriptGenerator:
             self.visit_assignment_stmt(node)
         elif isinstance(node, ReturnStmt):
             self.visit_return_stmt(node)
+        elif isinstance(node, ExpressionStmt):
+            self.visit_expression_stmt(node)
+        elif isinstance(node, ForStmt):
+            self.visit_for_stmt(node)
         # ... más casos para otros tipos de statements
+
+    def visit_expression_stmt(self, node):
+        """Visita un expression statement y genera el código para la expresión"""
+        expr_code = self.visit_expression(node.expression)
+        self.emit(f"{expr_code};")
 
     def visit_function_def(self, node):
         params = []
@@ -51,10 +61,12 @@ class TypeScriptGenerator:
             # Asegurarnos de que el tipo se mapee correctamente
             param_type = 'any'
             if param.type:
-                param_type = self.type_mapping.get(param.type.name, 'any')
+                # El parser ya ha mapeado los tipos correctamente, usarlos directamente
+                param_type = param.type.name
             params.append(f"{param.name}: {param_type}")
         
-        return_type = self.type_mapping.get(node.return_type, 'any')
+        # El parser ya ha mapeado el tipo de retorno, usar directamente
+        return_type = node.return_type if node.return_type else 'void'
         
         self.emit(f"function {node.name}({', '.join(params)}): {return_type} {{")
         self.indentation += 1
@@ -65,7 +77,12 @@ class TypeScriptGenerator:
 
     def visit_assignment_stmt(self, node):
         value = self.visit_expression(node.value)
-        self.emit(f"let {node.target.name} = {value};")
+        type_annotation = ''
+        
+        if hasattr(node, 'type') and node.type:
+            type_annotation = f": {self.type_mapping.get(node.type.name, 'any')}"
+        
+        self.emit(f"let {node.target.name}{type_annotation} = {value};")
 
     def visit_return_stmt(self, node):
         if node.value:
@@ -102,14 +119,20 @@ class TypeScriptGenerator:
 
     def transform_python_builtin(self, func_name: str, args: List[str]) -> str:
         """Transforma llamadas a funciones built-in de Python a TypeScript"""
-        if func_name == 'print':
-            return f"console.log({', '.join(args)})"
-        elif func_name == 'len':
-            return f"{args[0]}.length"
-        elif func_name == 'str':
-            return f"String({args[0]})"
-        elif func_name == 'int':
-            return f"parseInt({args[0]})"
+        builtin_map = {
+            'print': lambda args: f"console.log({', '.join(args)})",
+            'len': lambda args: f"{args[0]}.length",
+            'str': lambda args: f"String({args[0]})",
+            'int': lambda args: f"parseInt({args[0]})",
+            'float': lambda args: f"parseFloat({args[0]})",
+            'list': lambda args: f"Array.from({args[0]})",
+            'sum': lambda args: f"{args[0]}.reduce((a, b) => a + b, 0)",
+            'max': lambda args: f"Math.max(...{args[0]})",
+            'min': lambda args: f"Math.min(...{args[0]})"
+        }
+        
+        if func_name in builtin_map:
+            return builtin_map[func_name](args)
         return f"{func_name}({', '.join(args)})"
 
     def visit_expression(self, node):
@@ -136,11 +159,12 @@ class TypeScriptGenerator:
     def visit_call_expr(self, node):
         """Genera código para llamadas a funciones"""
         func_name = node.callee.name
-        # Mapear print de Python a console.log de TypeScript
-        if func_name == 'print':
-            func_name = 'console.log'
-        
         args = [self.visit_expression(arg) for arg in node.arguments]
+        
+        # Usar la transformación para funciones built-in
+        if func_name in ['print', 'len', 'str', 'int', 'float', 'list', 'sum', 'max', 'min']:
+            return self.transform_python_builtin(func_name, args)
+        
         return f"{func_name}({', '.join(args)})"
 
     def visit_unary_expr(self, node):
@@ -152,3 +176,50 @@ class TypeScriptGenerator:
     def visit_grouping_expr(self, node):
         """Genera código para expresiones agrupadas"""
         return f"({self.visit_expression(node.expression)})"
+
+    def visit_for_stmt(self, node):
+        """Genera código para un bucle for"""
+        iterator = self.visit_expression(node.variable)
+        iterable = self.visit_expression(node.iterable)
+        
+        # Si el iterable es un rango, traducirlo a un bucle for numerado en TypeScript
+        if isinstance(node.iterable, CallExpr) and node.iterable.callee.name == 'range':
+            args = node.iterable.arguments
+            if len(args) == 1:
+                # range(end)
+                self.emit(f"for (let {iterator} = 0; {iterator} < {self.visit_expression(args[0])}; {iterator}++) {{")
+            elif len(args) == 2:
+                # range(start, end)
+                self.emit(f"for (let {iterator} = {self.visit_expression(args[0])}; {iterator} < {self.visit_expression(args[1])}; {iterator}++) {{")
+            elif len(args) == 3:
+                # range(start, end, step)
+                step = self.visit_expression(args[2])
+                step_comparison = "<" if step == "1" else step.startswith("-") and ">" or "<"
+                self.emit(f"for (let {iterator} = {self.visit_expression(args[0])}; {iterator} {step_comparison} {self.visit_expression(args[1])}; {iterator} += {step}) {{")
+        else:
+            # Bucle for normal para otros iterables
+            self.emit(f"for (const {iterator} of {iterable}) {{")
+        
+        self.indentation += 1
+        for stmt in node.body:
+            self.visit_statement(stmt)
+        self.indentation -= 1
+        self.emit("}")
+
+    def visit_if_statement(self, node):
+        """Genera código para un if statement"""
+        condition = self.visit_expression(node.condition)
+        self.emit(f"if ({condition}) {{")
+        self.indentation += 1
+        for stmt in node.then_branch:
+            self.visit_statement(stmt)
+        self.indentation -= 1
+        
+        if node.else_branch:
+            self.emit("} else {")
+            self.indentation += 1
+            for stmt in node.else_branch:
+                self.visit_statement(stmt)
+            self.indentation -= 1
+        
+        self.emit("}")

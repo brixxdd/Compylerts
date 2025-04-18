@@ -87,6 +87,12 @@ class WhileStmt(Stmt):
     body: List[Stmt]
 
 @dataclass
+class ForStmt(Stmt):
+    variable: Identifier
+    iterable: Expr
+    body: List[Stmt]
+
+@dataclass
 class ErrorStmt(Stmt):
     """Representa un error sintáctico"""
     message: str
@@ -182,6 +188,12 @@ class IfStmt(Statement):
         self.condition = condition
         self.then_branch = then_branch
         self.else_branch = else_branch
+
+class ForStmt(Statement):
+    def __init__(self, variable, iterable, body):
+        self.variable = variable  # Nombre de la variable iteradora
+        self.iterable = iterable  # Expresión a iterar
+        self.body = body          # Lista de statements dentro del bucle
 
 # Expresiones
 class Expression(ASTNode):
