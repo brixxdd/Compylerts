@@ -55,7 +55,11 @@ class GroupingExpr(Expr):
 @dataclass
 class Literal(Expr):
     value: Any
-    type_name: str  # 'number', 'string', 'boolean', etc.
+    type_name: str  # 'number', 'string', 'boolean', 'fstring', etc.
+    
+    @property
+    def is_fstring(self):
+        return self.type_name == 'fstring'
 
 @dataclass
 class Identifier(Expr):

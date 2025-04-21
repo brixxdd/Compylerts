@@ -2,6 +2,7 @@ import ply.lex as lex
 from enum import Enum, auto
 from dataclasses import dataclass
 from typing import List, Optional
+import re
 
 # Definir nuestros propios tipos de token
 class TokenType(Enum):
@@ -22,6 +23,7 @@ class TokenType(Enum):
     ASYNC = auto()
     AWAIT = auto()
     TRAILING_COMMA = auto()
+    FSTRING = auto()
 
 @dataclass
 class Position:
@@ -39,7 +41,8 @@ known_functions = ['print', 'len', 'range', 'int', 'str', 'float', 'list', 'dict
 
 # Definición de tokens para PLY - solo los que realmente usamos
 tokens = (
-    'ID', 'NUMBER', 'STRING', 
+    'FSTRING',  # Debe estar primero
+    'ID', 'NUMBER', 'STRING',
     'PLUS', 'MINUS', 'TIMES', 'DIVIDE', 'MOD',
     'EQ', 'NE', 'LT', 'GT', 'LE', 'GE',
     'LPAREN', 'RPAREN', 
@@ -83,11 +86,14 @@ class PLYLexer:
     def __init__(self, text):
         # Configuración del lexer
         self.lexer = lex.lex(module=self)
-        self.lexer.input(text)
         self.errors = []
         self.source_lines = text.splitlines()
         self.valid_code = True
         self.lineno = 1  # Añadir contador de línea
+        
+        # Preprocesar el texto antes de pasarlo al lexer
+        processed_text = self.preprocess_fstrings(text)
+        self.lexer.input(processed_text)
         
         # Variables para manejar indentación
         self.indent_stack = [0]
@@ -102,30 +108,6 @@ class PLYLexer:
             self.valid_code = False
             return None
         
-        # Verificar errores comunes de escritura
-        common_typos = {
-            'pritn': 'print',
-            'pint': 'print',
-            'pirnt': 'print',
-            'lenght': 'length',
-            'retrun': 'return',
-            'retun': 'return',
-            'inut': 'input',
-            'inpt': 'input',
-            'imput': 'input'
-        }
-        
-        if t.value in common_typos:
-            error_msg = f"""Error léxico en línea {t.lexer.lineno}: '{t.value}' no es una palabra clave o función válida
-En el código:
-    {self.source_lines[t.lexer.lineno - 1]}
-    {' ' * self.source_lines[t.lexer.lineno - 1].find(t.value)}^ ¿Quisiste decir '{common_typos[t.value]}'?"""
-            self.errors.append(error_msg)
-            
-            # Importante: NO establecer valid_code a False para permitir que el análisis continúe
-            # En su lugar, corregir automáticamente el error para continuar
-            t.value = common_typos[t.value]
-        
         if t.value in self.keywords:
             t.type = 'KEYWORD'
         return t
@@ -138,9 +120,13 @@ En el código:
             t.value = int(t.value)
         return t
     
+    def t_FSTRING(self, t):
+        r'f"[^"]*"|f\'[^\']*\''
+        return t
+
     def t_STRING(self, t):
-        r'\"[^\"]*\"|\'[^\']*\''
-        t.value = t.value[1:-1]  # Eliminar las comillas
+        r'(?<!f)"[^"]*"|(?<!f)\'[^\']*\''
+        t.value = t.value[1:-1]
         return t
     
     def t_NEWLINE(self, t):
@@ -193,7 +179,6 @@ En el código:
     
     def token(self):
         """Método requerido por PLY para obtener el siguiente token"""
-        # Primero, verificar si hay tokens en la cola (INDENT/DEDENT)
         if self.tokens_queue:
             token_type, token_value, lineno = self.tokens_queue.pop(0)
             tok = lex.LexToken()
@@ -203,40 +188,23 @@ En el código:
             tok.lexpos = 0
             return tok
         
-        # Si no hay más tokens en el input, verificar paréntesis y corchetes sin cerrar
         tok = self.lexer.token()
-        if not tok:
-            # Verificar paréntesis sin cerrar
-            if self.paren_stack:
-                for line_no, pos in self.paren_stack:
-                    if 0 <= line_no - 1 < len(self.source_lines):
-                        line = self.source_lines[line_no - 1]
-                        column = pos - sum(len(l) + 1 for l in self.source_lines[:line_no - 1])
-                        self.errors.append(f"""Error sintáctico en línea {line_no}: Paréntesis sin cerrar
-En el código:
-    {line}
-    {' ' * column}^ Falta el paréntesis de cierre ')'
-Sugerencia: {line[:column+1]})""")
-                    
-            # Verificar corchetes sin cerrar
-            if self.bracket_stack:
-                for line_no, pos in self.bracket_stack:
-                    if 0 <= line_no - 1 < len(self.source_lines):
-                        line = self.source_lines[line_no - 1]
-                        column = pos - sum(len(l) + 1 for l in self.source_lines[:line_no - 1])
-                        self.errors.append(f"""Error sintáctico en línea {line_no}: Corchete sin cerrar
-En el código:
-    {line}
-    {' ' * column}^ Falta el corchete de cierre ']'
-Sugerencia: {line}]""")
-                    
-            if self.indent_stack[-1] > 0:
-                while len(self.indent_stack) > 1:
-                    self.indent_stack.pop()
-                    self.tokens_queue.append(('DEDENT', 'DEDENT', self.lineno))
-                return self.token()
-        
         if tok:
+            print(f"\nDEBUG TOKEN:")
+            print(f"Token: {tok.type}")
+            print(f"Valor: {tok.value if not hasattr(tok.value, 'content') else tok.value.content}")
+            print(f"Línea: {tok.lineno}")
+            
+            if tok.type == 'FSTRING':
+                # Asegurarnos que el valor sea un objeto FString
+                if not hasattr(tok.value, 'is_fstring'):
+                    content = tok.value
+                    class FString:
+                        def __init__(self, content):
+                            self.content = content
+                            self.is_fstring = True
+                    tok.value = FString(content)
+            
             tok.lineno = self.lineno
         
         return tok
@@ -310,3 +278,29 @@ En el código:
         except Exception as e:
             self.errors.append(f"Error inesperado: {str(e)}")
             return None
+
+    def is_fstring(self, value):
+        return hasattr(value, 'is_fstring')
+
+    def get_fstring_content(self, value):
+        return value.content if self.is_fstring(value) else value
+
+    def preprocess_fstrings(self, text):
+        """Convierte f-strings en strings normales preservando las comillas"""
+        def replace_fstring(match):
+            # Obtener el contenido completo incluyendo las comillas
+            full_match = match.group(0)
+            # Simplemente quitar la 'f' del inicio
+            return full_match[1:]
+        
+        pattern = r'f"[^"]*"|f\'[^\']*\''
+        processed_text = re.sub(pattern, replace_fstring, text)
+        print(f"\nDEBUG Preprocessor:")
+        print(f"Texto original: {text}")
+        print(f"Texto procesado: {processed_text}")
+        return processed_text
+    
+    def input(self, text):
+        """Sobrescribir el método input para preprocesar el texto"""
+        processed_text = self.preprocess_fstrings(text)
+        self.lexer.input(processed_text)

@@ -1,5 +1,6 @@
 from ast_nodes import *
 from typing import List, Dict
+import re
 
 class TypeScriptGenerator:
     def __init__(self):
@@ -131,21 +132,40 @@ class TypeScriptGenerator:
         return node.name
 
     def visit_literal(self, node):
-        """Genera código para literales, incluyendo listas"""
-        if node.type_name == 'list':
-            # Si el valor es una lista de nodos, necesitamos procesarlos
+        """Genera código para literales"""
+        if node.type_name == 'string':
+            # Si el valor comienza con ` es un template string
+            if node.value.startswith('`'):
+                return node.value  # Devolver el template string tal cual
+            return f'"{node.value}"'  # String normal
+        elif node.type_name == 'number':
+            return str(node.value)
+        elif node.type_name == 'boolean':
+            return str(node.value).lower()
+        elif node.type_name == 'null':
+            return 'null'
+        elif node.type_name == 'list':
             if hasattr(node.value, '__iter__') and not isinstance(node.value, str):
                 elements = [self.visit_expression(item) for item in node.value]
                 return f"[{', '.join(elements)}]"
             return str(node.value)
-        elif node.type_name == 'boolean':
-            return str(node.value).lower()  # 'True' -> 'true', 'False' -> 'false'
-        elif node.type_name == 'null':
-            return 'null'
         return str(node.value)
 
     def transform_python_builtin(self, func_name: str, args: List[str]) -> str:
         """Transforma llamadas a funciones built-in de Python a TypeScript"""
+        def convert_to_template_string(arg: str) -> str:
+            # Si el argumento es un string con {} para interpolación
+            if arg.startswith('"') and arg.endswith('"') and '{' in arg and '}' in arg:
+                # Quitar las comillas dobles
+                content = arg[1:-1]
+                # Convertir {expr} a ${expr}
+                processed = re.sub(r'\{([^}]+)\}', r'${\1}', content)
+                return f'`{processed}`'
+            return arg
+
+        # Procesar los argumentos para convertir strings con interpolación a template strings
+        processed_args = [convert_to_template_string(arg) for arg in args]
+        
         builtin_map = {
             'print': lambda args: f"console.log({', '.join(args)})",
             'len': lambda args: f"{args[0]}.length",
@@ -159,8 +179,8 @@ class TypeScriptGenerator:
         }
         
         if func_name in builtin_map:
-            return builtin_map[func_name](args)
-        return f"{func_name}({', '.join(args)})"
+            return builtin_map[func_name](processed_args)
+        return f"{func_name}({', '.join(processed_args)})"
 
     def visit_expression(self, node):
         """Visita y genera código para cualquier tipo de expresión"""

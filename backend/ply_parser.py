@@ -247,14 +247,19 @@ class PLYParser:
             body = p[8]
             p[0] = ForStmt(variable, iterable, body)
 
-    # <expression> ::= <binary_expression> | <primary_expression> | NUMBER | <list_literal>
+    # <expression> ::= <binary_expression> | <primary_expression> | NUMBER | <list_literal> | FSTRING
     def p_expression(self, p):
         '''expression : binary_expression
                      | primary_expression
                      | NUMBER
-                     | list_literal'''
+                     | list_literal
+                     | FSTRING'''
         if isinstance(p[1], (int, float)):
             p[0] = Literal(value=p[1], type_name='number')
+        elif isinstance(p[1], str) and p[1].startswith('f'):
+            # Es una f-string, extraer el contenido
+            content = p[1][2:-1]  # Remover f" y "
+            p[0] = Literal(value=content, type_name='fstring')
         else:
             p[0] = p[1]
     
@@ -324,7 +329,9 @@ class PLYParser:
                 p[0] = Literal(value=p[1] == 'True', type_name='boolean')
             elif p[1] == 'None':
                 p[0] = Literal(value=None, type_name='null')
-            else:  # String normal
+            else:
+                # Aquí ya no necesitamos verificación especial para f-strings
+                # ya que se tratan como strings normales
                 p[0] = Literal(value=p[1], type_name='string')
     
     # <group> ::= LPAREN <expression> RPAREN
@@ -336,6 +343,8 @@ class PLYParser:
     def p_call(self, p):
         '''call : ID LPAREN arguments RPAREN
                 | ID LPAREN RPAREN'''
+        print(f"\nDEBUG CALL:")
+        print(f"Función llamada: {p[1]}")
         func_name = p[1]
         args = [] if len(p) == 4 else p[3]
         
@@ -378,21 +387,11 @@ class PLYParser:
     # <arguments> ::= <expression> | <arguments> COMMA <expression>
     def p_arguments(self, p):
         '''arguments : expression
-                     | STRING
-                     | arguments COMMA expression
-                     | arguments COMMA STRING'''
+                     | arguments COMMA expression'''
         if len(p) == 2:
-            # Si es una expresión o string simple
-            if isinstance(p[1], str):
-                p[0] = [Literal(p[1], 'string')]
-            else:
-                p[0] = [p[1]]
+            p[0] = [p[1]]
         else:
-            # Si es una lista de argumentos con coma
-            if isinstance(p[3], str):
-                p[0] = p[1] + [Literal(p[3], 'string')]
-            else:
-                p[0] = p[1] + [p[3]]
+            p[0] = p[1] + [p[3]]
     
     # <return_type> ::= ARROW TYPE | empty
     def p_return_type(self, p):
@@ -532,6 +531,18 @@ En el código:
     def debug_production(self, p, rule_name):
         """Ayuda a depurar las producciones"""
         print(f"Debug - Regla {rule_name}: Tokens = {[str(x) for x in p[1:]]}")
+
+    def debug_token_stream(self, text):
+        """Método para debuggear el flujo de tokens"""
+        print("\nDEBUG: Analizando flujo de tokens")
+        print("=====================================")
+        lexer = PLYLexer(text)
+        while True:
+            tok = lexer.token()
+            if not tok:
+                break
+            print(f"Token: {tok.type:10} | Valor: {tok.value:20} | Línea: {tok.lineno}")
+        print("=====================================\n")
 
 def print_ast(node, indent=0):
     """Imprime el AST de forma legible"""
