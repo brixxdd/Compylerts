@@ -91,6 +91,10 @@ class PLYLexer:
         self.valid_code = True
         self.lineno = 1  # Añadir contador de línea
         
+        # Lista para mantener los últimos tokens
+        self.lexer.last_tokens = []
+        self.lexer.last_token = None
+        
         # Preprocesar el texto antes de pasarlo al lexer
         processed_text = self.preprocess_fstrings(text)
         self.lexer.input(processed_text)
@@ -186,28 +190,32 @@ En el código:
             tok.value = token_value
             tok.lineno = lineno
             tok.lexpos = 0
+            
+            # Guardar este token
+            self.lexer.last_token = tok
+            self.lexer.last_tokens.append(tok)
+            # Mantener solo los últimos 10 tokens
+            if len(self.lexer.last_tokens) > 10:
+                self.lexer.last_tokens.pop(0)
+                
             return tok
         
         tok = self.lexer.token()
         if tok:
+            # Guardar este token
+            self.lexer.last_token = tok
+            self.lexer.last_tokens.append(tok)
+            # Mantener solo los últimos 10 tokens
+            if len(self.lexer.last_tokens) > 10:
+                self.lexer.last_tokens.pop(0)
+            
             print(f"\nDEBUG TOKEN:")
             print(f"Token: {tok.type}")
-            print(f"Valor: {tok.value if not hasattr(tok.value, 'content') else tok.value.content}")
+            print(f"Valor: {tok.value}")
             print(f"Línea: {tok.lineno}")
             
-            if tok.type == 'FSTRING':
-                # Asegurarnos que el valor sea un objeto FString
-                if not hasattr(tok.value, 'is_fstring'):
-                    content = tok.value
-                    class FString:
-                        def __init__(self, content):
-                            self.content = content
-                            self.is_fstring = True
-                    tok.value = FString(content)
-            
-            tok.lineno = self.lineno
-        
-        return tok
+            return tok
+        return None
 
     def t_ARROW(self, t):
         r'->'
@@ -215,6 +223,7 @@ En el código:
 
     def t_COMMA(self, t):
         r','
+        t.lexer.last_token = t
         return t
 
     def t_LPAREN(self, t):

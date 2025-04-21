@@ -427,94 +427,70 @@ class PLYParser:
 
     # Manejo de errores
     def p_error(self, p):
-        if p is None:
-            error_msg = "Error sintáctico: Final inesperado del archivo"
-            self.errors.append(error_msg)
-            return
-        
-        # Obtener la línea completa donde está el error
-        line = self.source_lines[p.lineno - 1]
-        column = p.lexpos - sum(len(l) + 1 for l in self.source_lines[:p.lineno - 1])
-        
-        # Mensaje de error más descriptivo según el tipo de token
-        if p.type == 'COMMA':
-            error_msg = f"""Error sintáctico en línea {p.lineno}: Coma inesperada
+        if p:
+            line = self.source_lines[p.lineno - 1] if self.source_lines else ""
+            
+            # Detectar casos específicos de errores comunes
+            if p.type == 'NEWLINE':
+                prev_line = self.source_lines[p.lineno - 1]
+                if ' -> ' in prev_line and not prev_line.rstrip().endswith(':'):
+                    error_msg = f"""Error sintáctico en línea {p.lineno}: Falta dos puntos (:) después de la definición de función
+En el código:
+    {prev_line}
+    {' ' * (len(prev_line.rstrip()))}^ Falta ':' aquí"""
+                    self.errors = [error_msg]  # Solo mostrar este error
+                    self.valid_code = False
+                    # Detener el análisis aquí
+                    raise SyntaxError(error_msg)
+            
+            # Detectar el caso específico de parámetros faltantes
+            elif p.type == 'RPAREN' and hasattr(p.lexer, 'last_token') and p.lexer.last_token.type == 'COMMA':
+                error_msg = f"""Error sintáctico en línea {p.lineno}: Falta un parámetro después de la coma
 En el código:
     {line}
-    {' ' * column}^ Verifica que los argumentos estén correctamente separados"""
+    {' ' * self._find_column(p)}^ Se esperaba un valor después de la coma"""
+                self.errors = [error_msg]  # Solo mostrar este error
+                raise SyntaxError(error_msg)
+            else:
+                error_msg = f"""Error sintáctico en línea {p.lineno}: Token inesperado '{p.value}'
+En el código:
+    {line}
+    {' ' * self._find_column(p)}^ Aquí"""
+                self.errors = [error_msg]
+                raise SyntaxError(error_msg)
+            
+            self.valid_code = False
         else:
-            error_msg = f"""Error sintáctico en línea {p.lineno}: Token inesperado '{p.value}'
-En el código:
-    {line}
-    {' ' * column}^ Aquí"""
+            error_msg = "Error sintáctico: entrada inesperada al final del archivo"
+            self.errors = [error_msg]
+            self.valid_code = False
+            raise SyntaxError(error_msg)
+
+    def _find_column(self, token):
+        """Encuentra la columna donde está un token"""
+        if token is None or not hasattr(token, 'lexpos'):
+            return 0
+        if not hasattr(token.lexer, 'lexdata'):
+            return len(self.source_lines[token.lineno - 1]) if self.source_lines else 0
+        input = token.lexer.lexdata
+        last_cr = input.rfind('\n', 0, token.lexpos)
+        if last_cr < 0:
+            last_cr = 0
+        return token.lexpos - last_cr
+
+    def _is_function_def_context(self, token):
+        """Verifica si estamos en el contexto de una definición de función"""
+        if not hasattr(token.lexer, 'last_tokens'):
+            return False
         
-        self.errors.append(error_msg)
+        # Buscar los últimos tokens para ver si estamos después de una definición de función
+        last_tokens = getattr(token.lexer, 'last_tokens', [])
+        expected_sequence = ['KEYWORD', 'ID', 'LPAREN', 'RPAREN', 'ARROW', 'ID']
         
-        # Mejorar la recuperación de errores
-        # 1. Guardar el token actual para referencia
-        error_token = p
-
-        # 2. Intentar sincronizar hasta el siguiente punto seguro
-        while True:
-            try:
-                # Obtener el siguiente token
-                tok = self.parser.token()
-                if not tok:
-                    break
-                
-                # Lista de tokens que indican el final de una declaración
-                sync_tokens = ['NEWLINE', 'DEDENT']
-                
-                # Si encontramos un token de sincronización, intentar continuar desde ahí
-                if tok.type in sync_tokens:
-                    # Restaurar el estado del parser
-                    self.parser.restart()
-                    return tok
-
-                # Si encontramos el inicio de una nueva declaración, también es un buen punto para continuar
-                if tok.type == 'KEYWORD' and tok.value in ['def', 'if', 'else', 'for', 'while']:
-                    # Restaurar el estado del parser
-                    self.parser.restart()
-                    return tok
-
-            except Exception:
-                break
-
-        # Si llegamos aquí, no pudimos recuperarnos
-        # Al menos intentamos sincronizar con el siguiente token válido
-        self.parser.errok()
-        return None
-
-    def parse(self, text):
-        """Analiza el texto y construye el AST"""
-        self.source_lines = text.splitlines()
-        self.errors = []
-        self.semantic_errors = []
-        self.symbol_table = SymbolTable()
-        
-        try:
-            self.lexer = PLYLexer(text)
-            
-            if self.lexer.errors:
-                self.errors.extend(self.lexer.errors)
-            
-            # Desactivar el modo debug del parser
-            ast = self.parser.parse(lexer=self.lexer, debug=False)  # Cambiar debug=True a debug=False
-            
-            # Solo mostrar el AST si no hay errores sintácticos
-            if not self.errors:
-                print("\n=== AST Generated ===")
-                print_ast(ast)
-                print("===================\n")
-            
-            # Eliminar errores duplicados manteniendo el orden
-            seen = set()
-            self.errors = [x for x in self.errors if not (x in seen or seen.add(x))]
-            
-            return ast
-        except Exception as e:
-            self.errors.append(f"Error inesperado: {str(e)}")
-            return None
+        if len(last_tokens) >= len(expected_sequence):
+            recent_tokens = [t.type for t in last_tokens[-len(expected_sequence):]]
+            return recent_tokens == expected_sequence and last_tokens[-6].value == 'def'
+        return False
 
     # Modificar el método que verifica llamadas a funciones para evitar duplicados
     def _check_function_call(self, call_expr, line):
@@ -543,6 +519,42 @@ En el código:
                 break
             print(f"Token: {tok.type:10} | Valor: {tok.value:20} | Línea: {tok.lineno}")
         print("=====================================\n")
+
+    def parse(self, text):
+        """Analiza el texto y construye el AST"""
+        self.source_lines = text.splitlines()
+        self.errors = []
+        self.semantic_errors = []
+        self.symbol_table = SymbolTable()
+        
+        try:
+            self.lexer = PLYLexer(text)
+            
+            if self.lexer.errors:
+                self.errors.extend(self.lexer.errors)
+                return None
+            
+            # Desactivar el modo debug del parser
+            ast = self.parser.parse(lexer=self.lexer, debug=False)
+            
+            # Si hay errores sintácticos, no continuar con el análisis semántico
+            if self.errors:
+                return None
+            
+            # Solo mostrar el AST si no hay errores sintácticos
+            if not self.errors:
+                print("\n=== AST Generated ===")
+                print_ast(ast)
+                print("===================\n")
+            
+            return ast
+        except SyntaxError:
+            # No hacer nada, el error ya está en self.errors
+            return None
+        except Exception as e:
+            # Solo agregar errores inesperados que no sean de sintaxis
+            self.errors.append(f"Error inesperado: {str(e)}")
+            return None
 
 def print_ast(node, indent=0):
     """Imprime el AST de forma legible"""
