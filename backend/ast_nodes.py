@@ -248,3 +248,83 @@ def p_arguments(self, p):
     else:
         # Si es una lista de argumentos con coma
         p[0] = p[1] + [p[3] if isinstance(p[3], Literal) else Literal(p[3], 'string' if isinstance(p[3], str) else 'any')] 
+
+def print_ast(node, indent=0):
+    """Imprime el AST de forma legible"""
+    prefix = "  " * indent
+    
+    if isinstance(node, Program):
+        print(f"{prefix}Program")
+        for stmt in node.statements:
+            print_ast(stmt, indent + 1)
+    
+    elif isinstance(node, FunctionDef):
+        print(f"{prefix}FunctionDef: {node.name}")
+        print(f"{prefix}  Parameters: {[f'{p.name}: {p.type.name if p.type else "any"}' for p in node.params]}")
+        print(f"{prefix}  Return Type: {node.return_type}")
+        print(f"{prefix}  Body:")
+        for stmt in node.body:
+            print_ast(stmt, indent + 2)
+    
+    elif isinstance(node, ReturnStmt):
+        print(f"{prefix}Return:")
+        if node.value:
+            print_ast(node.value, indent + 1)
+    
+    elif isinstance(node, AssignmentStmt):
+        print(f"{prefix}Assignment:")
+        print(f"{prefix}  Target: {node.target.name}")
+        print(f"{prefix}  Value:", end=" ")
+        print_ast(node.value, 0)
+        print()  # Nueva línea después del valor
+    
+    elif isinstance(node, BinaryExpr):
+        print(f"{prefix}BinaryExpr: {node.operator}")
+        print(f"{prefix}  Left:", end=" ")
+        print_ast(node.left, 0)
+        print()
+        print(f"{prefix}  Right:", end=" ")
+        print_ast(node.right, 0)
+        print()
+    
+    elif isinstance(node, CallExpr):
+        print(f"{prefix}Call: {node.callee.name}")
+        print(f"{prefix}  Arguments:")
+        for arg in node.arguments:
+            print_ast(arg, indent + 2)
+    
+    elif isinstance(node, Identifier):
+        print(f"Identifier({node.name})", end="")
+    
+    elif isinstance(node, Literal):
+        if isinstance(node.value, str):
+            print(f"Literal(\"{node.value}\": {node.type_name})", end="")
+        else:
+            print(f"Literal({node.value}: {node.type_name})", end="")
+    
+    elif isinstance(node, IfStmt):
+        print(f"{prefix}If:")
+        print(f"{prefix}  Condition:")
+        print_ast(node.condition, indent + 2)
+        print(f"{prefix}  Then:")
+        for stmt in node.then_branch:
+            print_ast(stmt, indent + 2)
+        if node.else_branch:
+            print(f"{prefix}  Else:")
+            for stmt in node.else_branch:
+                print_ast(stmt, indent + 2)
+    
+    elif isinstance(node, ForStmt):
+        print(f"{prefix}For:")
+        print(f"{prefix}  Variable:", end=" ")
+        print_ast(node.variable, 0)
+        print()
+        print(f"{prefix}  Iterable:", end=" ")
+        print_ast(node.iterable, 0)
+        print()
+        print(f"{prefix}  Body:")
+        for stmt in node.body:
+            print_ast(stmt, indent + 2)
+    
+    else:
+        print(f"{prefix}Unknown node type: {type(node)}") 

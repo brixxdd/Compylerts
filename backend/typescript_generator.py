@@ -90,15 +90,26 @@ class TypeScriptGenerator:
                 inferred_type = 'string'
             elif node.value.type_name == 'boolean':
                 inferred_type = 'boolean'
+            elif node.value.type_name.startswith('list<'):
+                # Extraer el tipo de los elementos de la lista
+                element_type = node.value.type_name[5:-1]  # Remover 'list<' y '>'
+                if '|' in element_type:
+                    # Si es una lista con múltiples tipos
+                    types = [self.type_mapping.get(t.strip(), 'any') for t in element_type.split('|')]
+                    inferred_type = f"({' | '.join(types)})[]"
+                else:
+                    # Si es una lista de un solo tipo
+                    mapped_type = self.type_mapping.get(element_type.strip(), 'any')
+                    inferred_type = f"{mapped_type}[]"
             elif node.value.type_name == 'list':
-                inferred_type = 'any[]'  # Usar any[] como tipo por defecto para listas
+                inferred_type = 'any[]'
         
         if hasattr(node, 'type') and node.type:
             type_annotation = f": {self.type_mapping.get(node.type.name, inferred_type or 'any')}"
         elif inferred_type:
             type_annotation = f": {inferred_type}"
         
-        # Usar let para todas las asignaciones (podría refinarse para const si el valor no cambia)
+        # Usar let para todas las asignaciones
         self.emit(f"let {node.target.name}{type_annotation} = {value};")
 
     def visit_return_stmt(self, node):
@@ -133,22 +144,23 @@ class TypeScriptGenerator:
 
     def visit_literal(self, node):
         """Genera código para literales"""
-        if node.type_name == 'string':
+        if node.type_name.startswith('list<'):
+            # Para listas, visitar cada elemento
+            elements = [self.visit_expression(item) for item in node.value]
+            return f"[{', '.join(elements)}]"
+        elif node.type_name == 'string':
             # Si el valor comienza con ` es un template string
-            if node.value.startswith('`'):
-                return node.value  # Devolver el template string tal cual
-            return f'"{node.value}"'  # String normal
+            if isinstance(node.value, str):
+                if node.value.startswith('`'):
+                    return node.value  # Devolver el template string tal cual
+                return f'"{node.value}"'  # String normal
+            return f'"{str(node.value)}"'
         elif node.type_name == 'number':
             return str(node.value)
         elif node.type_name == 'boolean':
             return str(node.value).lower()
         elif node.type_name == 'null':
             return 'null'
-        elif node.type_name == 'list':
-            if hasattr(node.value, '__iter__') and not isinstance(node.value, str):
-                elements = [self.visit_expression(item) for item in node.value]
-                return f"[{', '.join(elements)}]"
-            return str(node.value)
         return str(node.value)
 
     def transform_python_builtin(self, func_name: str, args: List[str]) -> str:

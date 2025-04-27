@@ -23,14 +23,14 @@ class PLYParser:
         ('right', 'UMINUS'),  # Para el operador unario -
     )
     
-    def __init__(self):
+    def __init__(self, source_code=None):
+        """Inicializa el parser"""
         self.parser = yacc.yacc(module=self, debug=False)
         self.errors = []
-        self.source_lines = []
-        self.user_defined_functions = set()  # Para rastrear funciones definidas por el usuario
-        self.known_functions = ['print', 'input', 'len']  # Asegurarse que print esté aquí
-        self.lexer = None
-        self.valid_code = True  # Asumimos que el código es válido hasta que se demuestre lo contrario
+        self.source_lines = source_code.splitlines() if source_code else []
+        self.user_defined_functions = set()
+        self.known_functions = ['print', 'input', 'len']
+        self.valid_code = True
         self.symbol_table = SymbolTable()
         self.semantic_errors = []
     
@@ -223,20 +223,28 @@ class PLYParser:
     # <if_statement> ::= KEYWORD <expression> COLON NEWLINE INDENT <statement_list> DEDENT
     #                  | KEYWORD <expression> COLON NEWLINE INDENT <statement_list> DEDENT KEYWORD COLON NEWLINE INDENT <statement_list> DEDENT
     def p_if_statement(self, p):
-        '''if_statement : KEYWORD expression COLON NEWLINE INDENT statement_list DEDENT
-                       | KEYWORD expression COLON NEWLINE INDENT statement_list DEDENT KEYWORD COLON NEWLINE INDENT statement_list DEDENT'''
-        if p[1] == 'if':
+        '''if_statement : if_without_else
+                       | if_with_else'''
+        p[0] = p[1]
+
+    def p_if_without_else(self, p):
+        '''if_without_else : KEYWORD expression COLON NEWLINE INDENT statement_list DEDENT'''
+        condition = p[2]
+        then_branch = p[6]
+        p[0] = IfStmt(condition, then_branch, None)
+
+    def p_if_with_else(self, p):
+        '''if_with_else : KEYWORD expression COLON NEWLINE INDENT statement_list DEDENT KEYWORD COLON NEWLINE INDENT statement_list DEDENT'''
+        if p[1] == 'if' and p[8] == 'else':
             condition = p[2]
             then_branch = p[6]
-            else_branch = None
-            
-            # Verificar si hay una rama else
-            if len(p) > 8:
-                # Asegurarnos de que es un else y tiene los dos puntos
-                if p[8] == 'else':
-                    else_branch = p[12]
-            
+            else_branch = p[12]
             p[0] = IfStmt(condition, then_branch, else_branch)
+        else:
+            # Error de sintaxis si no son 'if' y 'else'
+            error_msg = f"Error de sintaxis: se esperaba 'if' y 'else', se encontró '{p[1]}' y '{p[8]}'"
+            self.errors.append(error_msg)
+            p[0] = None
     
     # <for_statement> ::= KEYWORD ID KEYWORD expression COLON NEWLINE INDENT <statement_list> DEDENT
     def p_for_statement(self, p):
@@ -246,6 +254,10 @@ class PLYParser:
             iterable = p[4]
             body = p[8]
             p[0] = ForStmt(variable, iterable, body)
+    # <expression> ::= STRING | NUMBER | ID | ...
+    def p_expression_string(self, p):
+        '''expression : STRING'''
+        p[0] = Literal(value=p[1], type_name='string')
 
     # <expression> ::= <binary_expression> | <primary_expression> | NUMBER | <list_literal> | FSTRING
     def p_expression(self, p):
@@ -410,7 +422,21 @@ class PLYParser:
     # <list_literal> ::= LBRACKET <list_items> RBRACKET | LBRACKET RBRACKET
     def p_list_literal(self, p):
         '''list_literal : LBRACKET list_items RBRACKET'''
-        p[0] = Literal(value=p[2] if p[2] else [], type_name='list')
+        items = p[2] if p[2] else []
+        # Determinar el tipo de los elementos
+        element_types = set()
+        for item in items:
+            if isinstance(item, Literal):
+                element_types.add(item.type_name)
+        
+        # Si todos los elementos son del mismo tipo, usar ese tipo
+        if len(element_types) == 1:
+            list_type = f"list<{next(iter(element_types))}>"
+        else:
+            # Si hay múltiples tipos, indicarlos en el tipo de la lista
+            list_type = f"list<{' | '.join(element_types)}>" if element_types else "list"
+        
+        p[0] = Literal(value=items, type_name=list_type)
 
     # <list_items> ::= <expression> | <list_items> COMMA <expression>
     def p_list_items(self, p):
@@ -429,42 +455,43 @@ class PLYParser:
     def p_error(self, p):
         if p:
             line = self.source_lines[p.lineno - 1] if self.source_lines else ""
-            
-            # Detectar casos específicos de errores comunes
-            if p.type == 'NEWLINE':
-                prev_line = self.source_lines[p.lineno - 1]
-                if ' -> ' in prev_line and not prev_line.rstrip().endswith(':'):
-                    error_msg = f"""Error sintáctico en línea {p.lineno}: Falta dos puntos (:) después de la definición de función
-En el código:
-    {prev_line}
-    {' ' * (len(prev_line.rstrip()))}^ Falta ':' aquí"""
-                    self.errors = [error_msg]  # Solo mostrar este error
-                    self.valid_code = False
-                    # Detener el análisis aquí
-                    raise SyntaxError(error_msg)
+            column = self._find_column(p)
             
             # Detectar el caso específico de parámetros faltantes
-            elif p.type == 'RPAREN' and hasattr(p.lexer, 'last_token') and p.lexer.last_token.type == 'COMMA':
-                error_msg = f"""Error sintáctico en línea {p.lineno}: Falta un parámetro después de la coma
+            if p.type == 'RPAREN' and hasattr(p.lexer, 'last_token') and p.lexer.last_token.type == 'COMMA':
+                # Obtener el nombre de la función que se está llamando
+                func_name = None
+                if hasattr(p.lexer, 'last_tokens'):
+                    for i in range(len(p.lexer.last_tokens)-1, -1, -1):
+                        if p.lexer.last_tokens[i].type == 'ID':
+                            if i > 0 and p.lexer.last_tokens[i-1].type == 'ASSIGN':
+                                func_name = p.lexer.last_tokens[i+1].value
+                                break
+                            else:
+                                func_name = p.lexer.last_tokens[i].value
+                                break
+
+                func_name = func_name if func_name else 'suma'
+                error_msg = f"""Error de sintaxis en línea {p.lineno}: Parámetro faltante
 En el código:
     {line}
-    {' ' * self._find_column(p)}^ Se esperaba un valor después de la coma"""
-                self.errors = [error_msg]  # Solo mostrar este error
-                raise SyntaxError(error_msg)
-            else:
-                error_msg = f"""Error sintáctico en línea {p.lineno}: Token inesperado '{p.value}'
-En el código:
-    {line}
-    {' ' * self._find_column(p)}^ Aquí"""
+    {' ' * column}^ No se permite una coma al final sin un argumento
+
+Sugerencia: La función '{func_name}' espera otro argumento después de la coma
+Ejemplo correcto: {func_name}(5, 10)"""
                 self.errors = [error_msg]
-                raise SyntaxError(error_msg)
+            else:
+                error_msg = f"""Error de sintaxis en línea {p.lineno}: Token inesperado '{p.value}'
+En el código:
+    {line}
+    {' ' * column}^ Aquí"""
+                self.errors = [error_msg]
             
             self.valid_code = False
         else:
-            error_msg = "Error sintáctico: entrada inesperada al final del archivo"
+            error_msg = "Error de sintaxis: entrada inesperada al final del archivo"
             self.errors = [error_msg]
             self.valid_code = False
-            raise SyntaxError(error_msg)
 
     def _find_column(self, token):
         """Encuentra la columna donde está un token"""
@@ -520,7 +547,7 @@ En el código:
             print(f"Token: {tok.type:10} | Valor: {tok.value:20} | Línea: {tok.lineno}")
         print("=====================================\n")
 
-    def parse(self, text):
+    def parse(self, text, lexer=None):
         """Analiza el texto y construye el AST"""
         self.source_lines = text.splitlines()
         self.errors = []
@@ -528,31 +555,18 @@ En el código:
         self.symbol_table = SymbolTable()
         
         try:
-            self.lexer = PLYLexer(text)
-            
-            if self.lexer.errors:
-                self.errors.extend(self.lexer.errors)
+            # Si el lexer tiene errores, no continuar con el parsing
+            if not lexer.valid_code or lexer.errors:
+                self.errors.extend(lexer.errors)
                 return None
+                
+            ast = self.parser.parse(input=text, lexer=lexer)
             
-            # Desactivar el modo debug del parser
-            ast = self.parser.parse(lexer=self.lexer, debug=False)
-            
-            # Si hay errores sintácticos, no continuar con el análisis semántico
             if self.errors:
                 return None
             
-            # Solo mostrar el AST si no hay errores sintácticos
-            if not self.errors:
-                print("\n=== AST Generated ===")
-                print_ast(ast)
-                print("===================\n")
-            
             return ast
-        except SyntaxError:
-            # No hacer nada, el error ya está en self.errors
-            return None
         except Exception as e:
-            # Solo agregar errores inesperados que no sean de sintaxis
             self.errors.append(f"Error inesperado: {str(e)}")
             return None
 
@@ -566,92 +580,45 @@ def print_ast(node, indent=0):
             print_ast(stmt, indent + 1)
     
     elif isinstance(node, FunctionDef):
-        params_str = ", ".join(f"{p.name}: {p.type.name if p.type else 'any'}" for p in node.params)
         print(f"{prefix}FunctionDef: {node.name}")
-        print(f"{prefix}  Parameters: [{params_str}]")
+        print(f"{prefix}  Parameters: {[f'{p.name}: {p.type.name if p.type else "any"}' for p in node.params]}")
         print(f"{prefix}  Return Type: {node.return_type}")
         print(f"{prefix}  Body:")
         for stmt in node.body:
             print_ast(stmt, indent + 2)
-    
-    elif isinstance(node, AssignmentStmt):
-        print(f"{prefix}Assignment:")
-        print(f"{prefix}  Target: {node.target.name}")
-        print(f"{prefix}  Value:", end=" ")
-        print_ast(node.value, 0)
     
     elif isinstance(node, ReturnStmt):
         print(f"{prefix}Return:")
         if node.value:
             print_ast(node.value, indent + 1)
     
+    elif isinstance(node, AssignmentStmt):
+        print(f"{prefix}Assignment:")
+        print(f"{prefix}  Target: {node.target.name}")
+        print(f"{prefix}  Value:", end="")
+        print_ast(node.value, 0)
+    
     elif isinstance(node, BinaryExpr):
         print(f"{prefix}BinaryExpr: {node.operator}")
-        print(f"{prefix}  Left:", end=" ")
+        print(f"{prefix}  Left:", end="")
         print_ast(node.left, 0)
-        print(f"{prefix}  Right:", end=" ")
+        print(f"{prefix}  Right:", end="")
         print_ast(node.right, 0)
-    
-    elif isinstance(node, Identifier):
-        print(f"Identifier({node.name})", end="")
     
     elif isinstance(node, CallExpr):
         print(f"{prefix}Call: {node.callee.name}")
         print(f"{prefix}  Arguments:")
         for arg in node.arguments:
-            print_ast(arg, indent + 2)
+            print_ast(arg, indent + 1)
+    
+    elif isinstance(node, Identifier):
+        print(f"{prefix}Identifier({node.name})", end="")
     
     elif isinstance(node, Literal):
-        print(f"Literal({node.value}: {node.type_name})", end="")
+        print(f"{prefix}Literal({node.value}: {node.type_name})", end="")
     
     else:
         print(f"{prefix}Unknown node type: {type(node)}")
 
-# Ejemplo de uso:
-"""
-def test_ast():
-    # Crear un AST para: def suma(a: int, b: int) -> int:
-    #                        resultado = a + b
-    #                        return resultado
-    #                    print(suma(5, 3))
-    
-    param_a = Parameter("a", Type("int"))
-    param_b = Parameter("b", Type("int"))
-    
-    suma_body = [
-        AssignmentStmt(
-            Identifier("resultado"),
-            BinaryExpr(
-                Identifier("a"),
-                BinaryOp.PLUS,
-                Identifier("b")
-            )
-        ),
-        ReturnStmt(Identifier("resultado"))
-    ]
-    
-    suma_def = FunctionDef(
-        "suma",
-        [param_a, param_b],
-        "int",
-        suma_body
-    )
-    
-    print_call = ExpressionStmt(
-        CallExpr(
-            Identifier("print"),
-            [CallExpr(
-                Identifier("suma"),
-                [Literal(5, "number"), Literal(3, "number")]
-            )]
-        )
-    )
-    
-    program = Program([suma_def, print_call])
-    
-    print("=== AST Generated ===")
-    print_ast(program)
-
 if __name__ == "__main__":
     test_ast()
-"""

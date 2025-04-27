@@ -2,6 +2,7 @@ import sys
 from ply_lexer import PLYLexer
 from ply_parser import PLYParser
 from typescript_generator import TypeScriptGenerator
+from ast_nodes import print_ast
 from colorama import init, Fore, Style
 
 # Inicializar colorama para salida con color
@@ -9,55 +10,74 @@ init()
 
 def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
     """Compila código Python a TypeScript"""
-    # Análisis léxico y sintáctico
-    lexer = PLYLexer(source_code)
-    parser = PLYParser()
-    ast = parser.parse(source_code)
-    
-    if parser.errors or parser.semantic_errors:
-        return None, parser.errors + parser.semantic_errors
-    
-    # Generación de código TypeScript
-    generator = TypeScriptGenerator()
-    typescript_code = generator.generate(ast)
-    
-    return typescript_code, []
+    try:
+        # Crear el lexer y parser
+        lexer = PLYLexer(source_code)
+        
+        # Si hay errores en el lexer o el código no es válido, retornar los errores inmediatamente
+        if not lexer.valid_code:
+            return None, lexer.errors
+        
+        parser = PLYParser(source_code)
+        
+        # Parsear el código
+        ast = parser.parser.parse(input=source_code, lexer=lexer.lexer)
+        
+        # Si hay errores en el parser, retornarlos
+        if parser.errors:
+            return None, parser.errors
+        
+        if ast:
+            print("\n=== AST Generated ===")
+            print_ast(ast)
+            print("===================\n")
+            
+            # Generación de código TypeScript
+            generator = TypeScriptGenerator()
+            typescript_code = generator.generate(ast)
+            return typescript_code, []
+        else:
+            return None, ["Error: No se pudo generar el AST"]
+            
+    except Exception as e:
+        return None, [f"❌ Error inesperado: {str(e)}"]
 
 def main():
     print("=== Compilador Python a TypeScript ===")
     print("Ingresa tu código Python (presiona Ctrl+D en Linux/Mac o Ctrl+Z en Windows para finalizar):")
     print("-" * 80)
     
-    # Leer código fuente
-    source_code = ""
+    # Leer el código fuente
     try:
+        source_code = ""
         while True:
-            line = input()
-            source_code += line + "\n"
-    except EOFError:
-        pass
-    
-    try:
-        # Compilar el código a TypeScript
-        typescript_code, errors = compile_to_typescript(source_code)
-        
-        if errors:
-            print("\n❌ Errores encontrados:")
-            for error in errors:
-                if "Error semántico" in error:
-                    print(f"{Fore.YELLOW}{error}{Style.RESET_ALL}")
-                else:
-                    print(f"{Fore.RED}{error}{Style.RESET_ALL}")
-        else:
-            print("\n✅ Compilación exitosa")
-            print("\nCódigo TypeScript generado:")
-            print("-" * 40)
-            print(typescript_code)
-            
+            try:
+                line = input()
+                source_code += line + "\n"
+            except EOFError:
+                break
+            except KeyboardInterrupt:
+                print("\nCompilación cancelada")
+                return
     except Exception as e:
-        print(f"\n❌ Error inesperado: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        print(f"\n❌ Error al leer el código: {str(e)}")
+        return
+    
+    # Compilar el código
+    typescript_code, errors = compile_to_typescript(source_code)
+    
+    # Mostrar errores si los hay
+    if errors:
+        print("\n❌ Errores encontrados:")
+        for error in errors:
+            print(error)
+        return
+    
+    # Mostrar el código TypeScript generado
+    print("\n✅ Compilación exitosa\n")
+    print("Código TypeScript generado:")
+    print("-" * 40)
+    print(typescript_code)
 
 if __name__ == "__main__":
     main()

@@ -92,6 +92,8 @@ class PLYLexer:
         self.lineno = 1  # Añadir contador de línea
         
         # Lista para mantener los últimos tokens
+        self.last_tokens = []
+        self.last_token = None
         self.lexer.last_tokens = []
         self.lexer.last_token = None
         
@@ -105,6 +107,30 @@ class PLYLexer:
         self.paren_stack = []  # Pila para rastrear paréntesis
         self.bracket_stack = []  # Nueva pila para rastrear corchetes
     
+    def t_STRING(self, t):
+        r'(?<!f)("([^"\n]|\\")*"|\'([^\'\n]|\\\')*\')'
+        # Las comillas están bien cerradas
+        t.value = t.value[1:-1]  # Remover las comillas
+        return t
+
+    def t_UNCLOSED_STRING(self, t):
+        r'(?<!f)("([^"\n]|\\")*|\'([^\'\n]|\\\')*)'
+        # Si llegamos aquí, es porque encontramos un string que empieza con comilla pero no termina correctamente
+        quote_type = '"' if t.value[0] == '"' else "'"
+        content = t.value[1:]  # El contenido sin la comilla inicial
+        error_msg = f"""Error léxico en línea {t.lexer.lineno}: String sin cerrar correctamente
+En el código:
+    {self.source_lines[t.lexer.lineno - 1]}
+    {' ' * self._find_column(t)}^ String '{content}' comienza con {quote_type} pero no se cierra
+Sugerencia: Asegúrate de cerrar el string con la misma comilla ({quote_type}):
+    nombre = {quote_type}{content}{quote_type}"""
+        self.errors.append(error_msg)
+        self.valid_code = False
+        # Avanzar hasta el final de la línea
+        while t.lexer.lexpos < len(t.lexer.lexdata) and t.lexer.lexdata[t.lexer.lexpos] != '\n':
+            t.lexer.lexpos += 1
+        return None
+
     def t_ID(self, t):
         r'[a-zA-Z_][a-zA-Z0-9_]*'
         if not all(ord(c) < 128 for c in t.value):
@@ -122,15 +148,6 @@ class PLYLexer:
             t.value = float(t.value)
         else:
             t.value = int(t.value)
-        return t
-    
-    def t_FSTRING(self, t):
-        r'f"[^"]*"|f\'[^\']*\''
-        return t
-
-    def t_STRING(self, t):
-        r'(?<!f)"[^"]*"|(?<!f)\'[^\']*\''
-        t.value = t.value[1:-1]
         return t
     
     def t_NEWLINE(self, t):
@@ -168,16 +185,12 @@ class PLYLexer:
         return None
     
     def t_error(self, t):
-        # Obtener la línea completa donde está el error
-        line = self.source_lines[t.lexer.lineno - 1]
-        column = t.lexpos - sum(len(l) + 1 for l in self.source_lines[:t.lexer.lineno - 1])
-        
-        error_msg = f"""Error léxico en línea {t.lexer.lineno}: Carácter no válido '{t.value[0]}'
+        # Solo mostrar error de carácter no válido si no es parte de un string sin cerrar
+        if not (t.value.startswith('"') or t.value.startswith("'")):
+            self.errors.append(f"""Error léxico en línea {t.lexer.lineno}: Carácter no válido '{t.value[0]}'
 En el código:
-    {line}
-    {' ' * column}^ Aquí se encontró el carácter no válido"""
-        
-        self.errors.append(error_msg)
+    {self.source_lines[t.lexer.lineno - 1]}
+    {' ' * self._find_column(t)}^ Aquí se encontró el carácter no válido""")
         self.valid_code = False
         t.lexer.skip(1)
     
@@ -192,20 +205,28 @@ En el código:
             tok.lexpos = 0
             
             # Guardar este token
+            self.last_token = tok
+            self.last_tokens.append(tok)
             self.lexer.last_token = tok
             self.lexer.last_tokens.append(tok)
             # Mantener solo los últimos 10 tokens
+            if len(self.last_tokens) > 10:
+                self.last_tokens.pop(0)
             if len(self.lexer.last_tokens) > 10:
                 self.lexer.last_tokens.pop(0)
-                
+            
             return tok
         
         tok = self.lexer.token()
         if tok:
             # Guardar este token
+            self.last_token = tok
+            self.last_tokens.append(tok)
             self.lexer.last_token = tok
             self.lexer.last_tokens.append(tok)
             # Mantener solo los últimos 10 tokens
+            if len(self.last_tokens) > 10:
+                self.last_tokens.pop(0)
             if len(self.lexer.last_tokens) > 10:
                 self.lexer.last_tokens.pop(0)
             
@@ -313,3 +334,12 @@ En el código:
         """Sobrescribir el método input para preprocesar el texto"""
         processed_text = self.preprocess_fstrings(text)
         self.lexer.input(processed_text)
+
+    def _find_column(self, token):
+        """Encuentra la columna donde está un token"""
+        if token is None:
+            return 0
+        last_cr = token.lexer.lexdata.rfind('\n', 0, token.lexpos)
+        if last_cr < 0:
+            last_cr = 0
+        return token.lexpos - last_cr
