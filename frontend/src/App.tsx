@@ -11,13 +11,19 @@ interface Token {
   line: number
 }
 
+interface InferredTypes {
+  [key: string]: string;
+}
+
 export interface CompileResponse {
   success: boolean
   tokens: Token[]
   errors: string[]
-  ast: any
+  ast?: any
   output: string[]
   phase: 'lexical' | 'syntactic' | 'semantic' | 'error'
+  typescript_code?: string
+  inferred_types?: InferredTypes
   analysis?: {
     lexical: { success: boolean, errors: string[], tokens?: Token[] }
     syntactic: { success: boolean, errors: string[] }
@@ -36,6 +42,9 @@ x = 5
 y = 10
 resultado = suma(x, y)
 print(resultado)
+
+# Lista simple de enteros
+numeros = [1, 2, 3, 4, 5]
 `)
   const [result, setResult] = useState<CompileResponse | null>(null)
   const [loading, setLoading] = useState(false)

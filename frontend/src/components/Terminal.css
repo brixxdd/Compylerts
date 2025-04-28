@@ -1,69 +1,281 @@
 .terminal-window {
-  background-color: #2d2d2d;
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  background-color: #1e1e1e;
+  border-radius: 8px;
   overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: 0;
+  margin-bottom: 20px;
+  height: 100%;
+  max-height: 700px;
 }
 
 .terminal-header {
-  background-color: #383838;
-  padding: 8px;
+  background-color: #333333;
+  padding: 8px 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
 }
 
 .terminal-title {
-  color: #d4d4d4;
-  font-size: 0.9rem;
+  font-size: 14px;
+  color: #cccccc;
+  font-family: monospace;
 }
 
 .terminal-buttons {
   display: flex;
-  gap: 6px;
 }
 
 .terminal-button {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  display: inline-block;
+  margin-left: 8px;
 }
 
-.terminal-button.close { background-color: #ff5f56; }
-.terminal-button.minimize { background-color: #ffbd2e; }
-.terminal-button.maximize { background-color: #27c93f; }
+.terminal-button.minimize {
+  background-color: #f1c40f;
+}
+
+.terminal-button.maximize {
+  background-color: #2ecc71;
+}
+
+.terminal-button.close {
+  background-color: #e74c3c;
+}
 
 .terminal-content {
-  flex: 1;
+  padding: 12px;
+  font-family: 'Courier New', monospace;
+  color: #f0f0f0;
   overflow-y: auto;
-  padding: 15px;
-  font-family: 'Consolas', 'Monaco', monospace;
-  min-height: 0;
+  flex-grow: 1;
+  max-height: calc(100vh - 250px);
 }
 
 .terminal-line {
-  color: #d4d4d4;
   white-space: pre-wrap;
   line-height: 1.5;
-}
-
-.terminal-code {
-  margin: 10px 0;
-  padding: 10px;
-  background-color: #1e1e1e;
-  border-radius: 4px;
-  white-space: pre;
+  margin-bottom: 2px;
 }
 
 .error-text {
-  color: #ff5f56;
+  color: #e74c3c;
 }
 
-.success-text {
-  color: #27c93f;
+.terminal-code {
+  background-color: #2d2d2d;
+  padding: 10px;
+  border-radius: 4px;
+  margin: 10px 0;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.prompt {
+  color: #3498db;
+  font-weight: bold;
+}
+
+.output-line {
+  font-family: 'Courier New', monospace;
+  color: #aaaaaa;
+  padding: 5px 0;
+}
+
+/* Nuevos estilos para pestañas y sección de TypeScript */
+.terminal-tabs {
+  display: flex;
+  background-color: #2d2d2d;
+  border-bottom: 1px solid #444444;
+}
+
+.terminal-tab {
+  padding: 8px 16px;
+  background: none;
+  border: none;
+  color: #aaaaaa;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.terminal-tab:hover {
+  background-color: #3d3d3d;
+  color: #f0f0f0;
+}
+
+.terminal-tab.active {
+  background-color: #1e1e1e;
+  color: #ffffff;
+  border-bottom: 2px solid #3498db;
+}
+
+/* Estilos para la sección de TypeScript */
+.typescript-code {
+  background-color: #2d2d2d;
+  padding: 10px;
+  border-radius: 4px;
+  margin: 10px 0;
+  overflow-x: auto;
+  white-space: pre;
+  color: #e6e1dc;
+  font-family: 'Courier New', monospace;
+  line-height: 1.6;
+  font-size: 14px;
+  max-height: 350px;
+  overflow-y: auto;
+}
+
+.typescript-code .keyword {
+  color: #569cd6;
+}
+
+.typescript-code .string {
+  color: #ce9178;
+}
+
+.typescript-code .number {
+  color: #b5cea8;
+}
+
+.typescript-code .comment {
+  color: #6a9955;
+}
+
+.inferred-types-section {
+  margin: 15px 0;
+  background-color: #2a2a2a;
+  padding: 10px;
+  border-radius: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.types-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-family: 'Courier New', monospace;
+}
+
+.types-table th {
+  text-align: left;
+  padding: 8px;
+  border-bottom: 1px solid #444444;
+  color: #3498db;
+}
+
+.types-table td {
+  padding: 8px;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+.types-table td:first-child {
+  color: #f39c12;
+  font-weight: bold;
+}
+
+.types-table td:last-child {
+  color: #2ecc71;
+}
+
+/* Resaltado de tipos específicos */
+.types-table td:last-child:contains("number[]") {
+  color: #e74c3c;
+}
+
+.types-table td:last-child:contains("string[]") {
+  color: #9b59b6;
+}
+
+.types-table td:last-child:contains("boolean[]") {
+  color: #f1c40f;
+}
+
+/* Estilos para destacar líneas de error/éxito */
+.error-line {
+  background-color: rgba(231, 76, 60, 0.2);
+  font-weight: bold;
+}
+
+.success-line {
+  color: #2ecc71;
+  font-weight: bold;
+}
+
+/* Mejora para la visualización de errores */
+.error-message {
+  background-color: #2d2d2d;
+  border-left: 3px solid #e74c3c;
+  padding: 8px 12px;
+  margin: 8px 0;
+  border-radius: 0 4px 4px 0;
+}
+
+/* Estilos para el botón de descarga */
+.download-button-container {
+  margin: 10px 0;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.download-button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 20px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.download-button:hover {
+  background-color: #2980b9;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+}
+
+.download-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.download-icon {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+/* Estructura de 2 columnas para la sección de TypeScript con más espacio */
+.ts-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 15px;
+}
+
+/* En pantallas más grandes, mostrar en 2 columnas */
+@media (min-width: 1200px) {
+  .ts-container {
+    flex-direction: row;
+  }
+  
+  .ts-code-section {
+    flex: 3;
+  }
+  
+  .ts-info-section {
+    flex: 1;
+    max-width: 300px;
+  }
 }
