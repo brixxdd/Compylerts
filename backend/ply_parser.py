@@ -220,30 +220,25 @@ class PLYParser:
         type_name = type_mapping.get(p[1], p[1])
         p[0] = Type(type_name)
     
-    # <if_statement> ::= KEYWORD <expression> COLON NEWLINE INDENT <statement_list> DEDENT
-    #                  | KEYWORD <expression> COLON NEWLINE INDENT <statement_list> DEDENT KEYWORD COLON NEWLINE INDENT <statement_list> DEDENT
+    # <if_statement> ::= KEYWORD expression COLON NEWLINE INDENT statement_list DEDENT
+    #                  | KEYWORD expression COLON NEWLINE INDENT statement_list DEDENT KEYWORD COLON NEWLINE INDENT statement_list DEDENT
     def p_if_statement(self, p):
-        '''if_statement : if_without_else
-                       | if_with_else'''
-        p[0] = p[1]
-
-    def p_if_without_else(self, p):
-        '''if_without_else : KEYWORD expression COLON NEWLINE INDENT statement_list DEDENT'''
-        condition = p[2]
-        then_branch = p[6]
-        p[0] = IfStmt(condition, then_branch, None)
-
-    def p_if_with_else(self, p):
-        '''if_with_else : KEYWORD expression COLON NEWLINE INDENT statement_list DEDENT KEYWORD COLON NEWLINE INDENT statement_list DEDENT'''
-        if p[1] == 'if' and p[8] == 'else':
+        '''if_statement : KEYWORD expression COLON NEWLINE INDENT statement_list DEDENT
+                       | KEYWORD expression COLON NEWLINE INDENT statement_list DEDENT KEYWORD COLON NEWLINE INDENT statement_list DEDENT'''
+        if p[1] == 'if':
             condition = p[2]
             then_branch = p[6]
-            else_branch = p[12]
+            else_branch = None
+            if len(p) > 8:
+                if p[8] == 'else':
+                    else_branch = p[12]
+                else:
+                    self.errors.append(f"Error de sintaxis: se esperaba 'else', se encontró '{p[8]}'")
+                    p[0] = None
+                    return
             p[0] = IfStmt(condition, then_branch, else_branch)
         else:
-            # Error de sintaxis si no son 'if' y 'else'
-            error_msg = f"Error de sintaxis: se esperaba 'if' y 'else', se encontró '{p[1]}' y '{p[8]}'"
-            self.errors.append(error_msg)
+            self.errors.append(f"Error de sintaxis: se esperaba 'if', se encontró '{p[1]}'")
             p[0] = None
     
     # <for_statement> ::= KEYWORD ID KEYWORD expression COLON NEWLINE INDENT <statement_list> DEDENT
@@ -453,6 +448,7 @@ class PLYParser:
 
     # Manejo de errores
     def p_error(self, p):
+        """Manejo de errores sintácticos"""
         if p:
             line = self.source_lines[p.lineno - 1] if self.source_lines else ""
             column = self._find_column(p)
@@ -470,7 +466,7 @@ class PLYParser:
                             else:
                                 func_name = p.lexer.last_tokens[i].value
                                 break
-
+                
                 func_name = func_name if func_name else 'suma'
                 error_msg = f"""Error de sintaxis en línea {p.lineno}: Parámetro faltante
 En el código:
@@ -481,7 +477,14 @@ Sugerencia: La función '{func_name}' espera otro argumento después de la coma
 Ejemplo correcto: {func_name}(5, 10)"""
                 self.errors = [error_msg]
             else:
-                error_msg = f"""Error de sintaxis en línea {p.lineno}: Token inesperado '{p.value}'
+                # Detectar el caso específico del else sin if
+                if p.type == 'KEYWORD' and p.value == 'else':
+                    error_msg = f"""Error de sintaxis en línea {p.lineno}: 'else' sin 'if' correspondiente
+En el código:
+    {line}
+    {' ' * column}^ El 'else' debe estar precedido por un bloque 'if'"""
+                else:
+                    error_msg = f"""Error de sintaxis en línea {p.lineno}: Token inesperado '{p.value}'
 En el código:
     {line}
     {' ' * column}^ Aquí"""

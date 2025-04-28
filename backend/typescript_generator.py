@@ -266,7 +266,7 @@ class TypeScriptGenerator:
         self.emit("}")
 
     def visit_if_statement(self, node):
-        """Genera código para un if statement"""
+        """Genera código para una sentencia if"""
         condition = self.visit_expression(node.condition)
         self.emit(f"if ({condition}) {{")
         self.indentation += 1

@@ -138,8 +138,10 @@ Sugerencia: Asegúrate de cerrar el string con la misma comilla ({quote_type}):
             self.valid_code = False
             return None
         
+        # Verificar si es una palabra clave
         if t.value in self.keywords:
             t.type = 'KEYWORD'
+            print(f"\nDEBUG KEYWORD: Found keyword '{t.value}'")  # Debug info
         return t
     
     def t_NUMBER(self, t):
@@ -154,15 +156,12 @@ Sugerencia: Asegúrate de cerrar el string con la misma comilla ({quote_type}):
         r'\n+'
         t.lexer.lineno += len(t.value)
         self.lineno = t.lexer.lineno
-        
         if t.lexer.lexpos < len(t.lexer.lexdata):
             pos = t.lexer.lexpos
             while pos < len(t.lexer.lexdata) and t.lexer.lexdata[pos] in ' \t':
                 pos += 1
-            
             if pos < len(t.lexer.lexdata) and t.lexer.lexdata[pos] != '\n' and t.lexer.lexdata[pos:pos+1] != '#':
                 indent = pos - t.lexer.lexpos
-                
                 if indent > self.indent_stack[-1]:
                     self.indent_stack.append(indent)
                     self.tokens_queue.append(('INDENT', 'INDENT', self.lineno))
@@ -170,7 +169,6 @@ Sugerencia: Asegúrate de cerrar el string con la misma comilla ({quote_type}):
                     while indent < self.indent_stack[-1]:
                         self.indent_stack.pop()
                         self.tokens_queue.append(('DEDENT', 'DEDENT', self.lineno))
-                    
                     if indent != self.indent_stack[-1]:
                         expected_indent = self.indent_stack[-1]
                         self.errors.append(
@@ -204,6 +202,12 @@ En el código:
             tok.lineno = lineno
             tok.lexpos = 0
             
+            # Debug info
+            print(f"\nDEBUG TOKEN (from queue):")
+            print(f"Token: {tok.type}")
+            print(f"Valor: {tok.value}")
+            print(f"Línea: {tok.lineno}")
+            
             # Guardar este token
             self.last_token = tok
             self.last_tokens.append(tok)
@@ -219,6 +223,12 @@ En el código:
         
         tok = self.lexer.token()
         if tok:
+            # Debug info
+            print(f"\nDEBUG TOKEN (from lexer):")
+            print(f"Token: {tok.type}")
+            print(f"Valor: {tok.value}")
+            print(f"Línea: {tok.lineno}")
+            
             # Guardar este token
             self.last_token = tok
             self.last_tokens.append(tok)
@@ -229,11 +239,6 @@ En el código:
                 self.last_tokens.pop(0)
             if len(self.lexer.last_tokens) > 10:
                 self.lexer.last_tokens.pop(0)
-            
-            print(f"\nDEBUG TOKEN:")
-            print(f"Token: {tok.type}")
-            print(f"Valor: {tok.value}")
-            print(f"Línea: {tok.lineno}")
             
             return tok
         return None
