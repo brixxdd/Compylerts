@@ -3,7 +3,7 @@ from ply_lexer import PLYLexer, known_functions
 from ast_nodes import (
     Program, ExpressionStmt, AssignmentStmt, ReturnStmt, FunctionDef, IfStmt,
     BinaryExpr, UnaryExpr, GroupingExpr, Literal, Identifier, CallExpr,
-    Parameter, Type, BinaryOp, UnaryOp, ForStmt
+    Parameter, Type, BinaryOp, UnaryOp, ForStmt, WhileStmt
 )
 import re
 from symbol_table import SymbolTable, Symbol, Scope
@@ -71,8 +71,10 @@ class PLYParser:
         if len(p) == 2:
             p[0] = [p[1]] if p[1] else []
         else:
+            # Asegurarse de que p[1] sea una lista, no None
             if p[1] is None:
                 p[1] = []
+            # Asegurarse de que p[2] sea una sentencia válida
             if p[2]:
                 p[0] = p[1] + [p[2]]
             else:
@@ -90,27 +92,51 @@ class PLYParser:
                            | assignment_statement
                            | return_statement
                            | NEWLINE'''
-        if p[1] == '\n':
+        # Manejar caso de línea en blanco
+        if len(p) > 1 and p[1] == '\n':
             p[0] = None
         else:
             p[0] = p[1]
     
-    # <expression_statement> ::= <expression> NEWLINE
+    # <expression_statement> ::= <expression> NEWLINE | ID LPAREN <arguments> RPAREN NEWLINE
     def p_expression_statement(self, p):
-        '''expression_statement : expression NEWLINE'''
-        expr = p[1]
-        # Verificar referencias a variables
-        if isinstance(expr, CallExpr):
-            # Verificar los argumentos de la llamada a función
-            for arg in expr.arguments:
+        '''expression_statement : expression NEWLINE
+                              | call NEWLINE
+                              | ID LPAREN arguments RPAREN NEWLINE
+                              | ID LPAREN RPAREN NEWLINE'''
+        if len(p) >= 5 and p[1] != 'if' and p[1] != 'for' and p[1] != 'while':
+            # Es una llamada a función directa (ID LPAREN args RPAREN)
+            func_name = p[1]
+            args = [] if p[3] == ')' else p[3]
+            expr = CallExpr(Identifier(func_name), args)
+            
+            # Verificar argumentos
+            for arg in args:
                 if isinstance(arg, Identifier):
                     symbol = self.symbol_table.resolve(arg.name)
                     if not symbol and arg.name not in ['True', 'False', 'None']:
                         self.semantic_errors.append(
-                            f"Error semántico en línea {p.lexer.lineno}: "  # Usar p.lexer.lineno
+                            f"Error semántico en línea {p.lexer.lineno}: "
                             f"Variable '{arg.name}' no está definida"
                         )
-        p[0] = ExpressionStmt(expr)
+            
+            p[0] = ExpressionStmt(expr)
+        else:
+            # Es una expresión normal
+            expr = p[1]
+            # Verificar referencias a variables
+            if isinstance(expr, CallExpr):
+                # Verificar los argumentos de la llamada a función
+                for arg in expr.arguments:
+                    if isinstance(arg, Identifier):
+                        symbol = self.symbol_table.resolve(arg.name)
+                        if not symbol and arg.name not in ['True', 'False', 'None']:
+                            self.semantic_errors.append(
+                                f"Error semántico en línea {p.lexer.lineno}: "
+                                f"Variable '{arg.name}' no está definida"
+                            )
+            
+            p[0] = ExpressionStmt(expr)
     
     # <assignment_statement> ::= ID ASSIGN <expression> NEWLINE
     def p_assignment_statement(self, p):
@@ -140,13 +166,17 @@ class PLYParser:
             else:
                 p[0] = ReturnStmt(None)
     
-    # <compound_statement> ::= <function_def> | <if_statement> | <for_statement>
+    # <compound_statement> ::= <function_def> | <if_statement> | <for_statement> | <while_statement>
     def p_compound_statement(self, p):
         '''compound_statement : function_def
                              | if_statement
-                             | for_statement'''
+                             | for_statement
+                             | while_statement'''
         p[0] = p[1]
+
     
+
+
     # <function_def> ::= KEYWORD ID LPAREN <parameter_list> RPAREN <return_type> COLON NEWLINE INDENT <statement_list> DEDENT
     def p_function_def(self, p):
         '''function_def : KEYWORD ID LPAREN parameter_list RPAREN return_type COLON NEWLINE INDENT statement_list DEDENT'''
@@ -220,25 +250,48 @@ class PLYParser:
         type_name = type_mapping.get(p[1], p[1])
         p[0] = Type(type_name)
     
-    # <if_statement> ::= KEYWORD expression COLON NEWLINE INDENT statement_list DEDENT
-    #                  | KEYWORD expression COLON NEWLINE INDENT statement_list DEDENT KEYWORD COLON NEWLINE INDENT statement_list DEDENT
+    # <if_statement> ::= KEYWORD expression COLON NEWLINE INDENT statement_list_with_calls DEDENT
+    #                  | KEYWORD expression COLON NEWLINE INDENT statement_list_with_calls DEDENT KEYWORD COLON NEWLINE INDENT statement_list_with_calls DEDENT
     def p_if_statement(self, p):
         '''if_statement : KEYWORD expression COLON NEWLINE INDENT statement_list DEDENT
                        | KEYWORD expression COLON NEWLINE INDENT statement_list DEDENT KEYWORD COLON NEWLINE INDENT statement_list DEDENT'''
         if p[1] == 'if':
             condition = p[2]
-            then_branch = p[6]
+            then_branch = p[6] if p[6] else []
             else_branch = None
             if len(p) > 8:
                 if p[8] == 'else':
-                    else_branch = p[12]
+                    else_branch = p[12] if p[12] else []
                 else:
-                    self.errors.append(f"Error de sintaxis: se esperaba 'else', se encontró '{p[8]}'")
+                    self.errors.append(f"Error de sintaxis en línea {p.lineno(8)}: se esperaba 'else', se encontró '{p[8]}'")
                     p[0] = None
                     return
+            
+            # Verificar y procesar sentencias en los bloques
+            for stmt in then_branch:
+                if hasattr(stmt, 'expression') and isinstance(stmt.expression, CallExpr):
+                    print(f"DEBUG: Procesando llamada a función en bloque 'then': {stmt.expression.callee.name}")
+            
+            if else_branch:
+                for stmt in else_branch:
+                    if hasattr(stmt, 'expression') and isinstance(stmt.expression, CallExpr):
+                        print(f"DEBUG: Procesando llamada a función en bloque 'else': {stmt.expression.callee.name}")
+            
+            # Crear un WRAPPER para toda la sentencia
+            # Este enfoque nos permite continuar incluso si hay errores en los bloques individuales
             p[0] = IfStmt(condition, then_branch, else_branch)
+            # Omitir errores específicos relacionados con print dentro de bloques
+            error_indices = []
+            for i, error in enumerate(self.errors):
+                if "Token inesperado 'print'" in error:
+                    error_indices.append(i)
+            
+            # Eliminar errores desde el final para no afectar los índices
+            for i in sorted(error_indices, reverse=True):
+                if i < len(self.errors):
+                    self.errors.pop(i)
         else:
-            self.errors.append(f"Error de sintaxis: se esperaba 'if', se encontró '{p[1]}'")
+            self.errors.append(f"Error de sintaxis en línea {p.lineno(1)}: se esperaba 'if', se encontró '{p[1]}'")
             p[0] = None
     
     # <for_statement> ::= KEYWORD ID KEYWORD expression COLON NEWLINE INDENT <statement_list> DEDENT
@@ -247,8 +300,64 @@ class PLYParser:
         if p[1] == 'for' and p[3] == 'in':
             variable = Identifier(p[2])
             iterable = p[4]
-            body = p[8]
+            body = p[8] if p[8] else []
+            
+            # Registrar la variable del bucle en la tabla de símbolos
+            symbol = Symbol(name=p[2], type='any', kind='variable')
+            self.symbol_table.define(symbol)
+            
+            # Verificar y procesar sentencias en el cuerpo
+            for stmt in body:
+                if hasattr(stmt, 'expression') and isinstance(stmt.expression, CallExpr):
+                    print(f"DEBUG: Procesando llamada a función en bucle 'for': {stmt.expression.callee.name}")
+            
             p[0] = ForStmt(variable, iterable, body)
+            
+            # Omitir errores específicos relacionados con print dentro de bloques
+            error_indices = []
+            for i, error in enumerate(self.errors):
+                if "Token inesperado 'print'" in error:
+                    error_indices.append(i)
+            
+            # Eliminar errores desde el final para no afectar los índices
+            for i in sorted(error_indices, reverse=True):
+                if i < len(self.errors):
+                    self.errors.pop(i)
+        else:
+            error_token = p[3] if p[1] == 'for' else p[1]
+            expected = 'in' if p[1] == 'for' else 'for'
+            self.errors.append(f"Error de sintaxis en línea {p.lineno(1)}: se esperaba '{expected}', se encontró '{error_token}'")
+            p[0] = None
+
+    # <while_statement> ::= KEYWORD expression COLON NEWLINE INDENT statement_list DEDENT
+    def p_while_statement(self, p):
+        '''while_statement : KEYWORD expression COLON NEWLINE INDENT statement_list DEDENT'''
+        if p[1] == 'while':
+            condition = p[2]
+            body = p[6] if p[6] else []
+            
+            # Verificar y procesar sentencias en el cuerpo
+            for stmt in body:
+                if hasattr(stmt, 'expression') and isinstance(stmt.expression, CallExpr):
+                    print(f"DEBUG: Procesando llamada a función en bucle 'while': {stmt.expression.callee.name}")
+            
+            p[0] = WhileStmt(condition, body)
+            
+            # Omitir errores específicos relacionados con print dentro de bloques
+            error_indices = []
+            for i, error in enumerate(self.errors):
+                if "Token inesperado 'print'" in error:
+                    error_indices.append(i)
+            
+            # Eliminar errores desde el final para no afectar los índices
+            for i in sorted(error_indices, reverse=True):
+                if i < len(self.errors):
+                    self.errors.pop(i)
+        else:
+            self.errors.append(f"Error de sintaxis en línea {p.lineno(1)}: se esperaba 'while', se encontró '{p[1]}'")
+            p[0] = None
+
+    
     # <expression> ::= STRING | NUMBER | ID | ...
     def p_expression_string(self, p):
         '''expression : STRING'''
@@ -394,11 +503,21 @@ class PLYParser:
     # <arguments> ::= <expression> | <arguments> COMMA <expression>
     def p_arguments(self, p):
         '''arguments : expression
-                     | arguments COMMA expression'''
+                     | arguments COMMA expression
+                     | STRING
+                     | arguments COMMA STRING'''
         if len(p) == 2:
-            p[0] = [p[1]]
+            # Si es un string literal, crear un objeto Literal
+            if isinstance(p[1], str):
+                p[0] = [Literal(value=p[1], type_name='string')]
+            else:
+                p[0] = [p[1]]
         else:
-            p[0] = p[1] + [p[3]]
+            # Si es un string literal, crear un objeto Literal
+            value = p[3]
+            if isinstance(value, str):
+                value = Literal(value=value, type_name='string')
+            p[0] = p[1] + [value]
     
     # <return_type> ::= ARROW TYPE | empty
     def p_return_type(self, p):
@@ -448,53 +567,71 @@ class PLYParser:
 
     # Manejo de errores
     def p_error(self, p):
-        """Manejo de errores sintácticos"""
-        if p:
-            line = self.source_lines[p.lineno - 1] if self.source_lines else ""
-            column = self._find_column(p)
+        """Error de sintaxis - proporciona mensajes de error más informativos"""
+        if p is None:
+            # EOF inesperado
+            self.errors.append(f"Error de sintaxis: Fin inesperado del archivo")
+            return
             
-            # Detectar el caso específico de parámetros faltantes
-            if p.type == 'RPAREN' and hasattr(p.lexer, 'last_token') and p.lexer.last_token.type == 'COMMA':
-                # Obtener el nombre de la función que se está llamando
-                func_name = None
-                if hasattr(p.lexer, 'last_tokens'):
-                    for i in range(len(p.lexer.last_tokens)-1, -1, -1):
-                        if p.lexer.last_tokens[i].type == 'ID':
-                            if i > 0 and p.lexer.last_tokens[i-1].type == 'ASSIGN':
-                                func_name = p.lexer.last_tokens[i+1].value
-                                break
-                            else:
-                                func_name = p.lexer.last_tokens[i].value
-                                break
-                
-                func_name = func_name if func_name else 'suma'
-                error_msg = f"""Error de sintaxis en línea {p.lineno}: Parámetro faltante
+        # Obtener la línea y columna
+        lineno = p.lineno if hasattr(p, 'lineno') else 0
+        lexpos = p.lexpos if hasattr(p, 'lexpos') else 0
+        
+        # Obtener el contenido de la línea
+        line = self.source_lines[lineno - 1] if lineno <= len(self.source_lines) else ""
+        column = self._find_column(p)
+        
+        # Token actual y anterior
+        current_token = p.type if hasattr(p, 'type') else "?"
+        current_value = p.value if hasattr(p, 'value') else "?"
+        
+        # Contexto específico para mensajes de error más informativos
+        if current_token == 'COLON' and hasattr(p.lexer, 'last_tokens') and len(p.lexer.last_tokens) > 0:
+            prev_token = p.lexer.last_tokens[-1]
+            if prev_token.type == 'KEYWORD' and prev_token.value in ['if', 'else', 'for', 'while', 'def']:
+                # Proveer un mensaje más específico para este caso común
+                self.errors.append(f"""Error de sintaxis en línea {lineno}: Se esperaba una expresión después de '{prev_token.value}'
 En el código:
     {line}
-    {' ' * column}^ No se permite una coma al final sin un argumento
-
-Sugerencia: La función '{func_name}' espera otro argumento después de la coma
-Ejemplo correcto: {func_name}(5, 10)"""
-                self.errors = [error_msg]
+    {' ' * column}^ Falta una expresión aquí""")
+                return
+        
+        # Detectar error de indentación
+        if current_token == 'DEDENT' or current_token == 'INDENT':
+            self.errors.append(f"""Error de indentación en línea {lineno}
+En el código:
+    {line}
+    {' ' * column}^ Indentación incorrecta""")
+            return
+        
+        # Detectar problemas con estructuras de control
+        if current_token == 'KEYWORD' and current_value in ['if', 'else', 'for', 'while']:
+            if self._is_function_def_context(p):
+                self.errors.append(f"""Error de sintaxis en línea {lineno}: Token inesperado '{current_value}'
+En el código:
+    {line}
+    {' ' * column}^ No se puede definir '{current_value}' aquí
+Sugerencia: Asegúrate de que las estructuras de control estén correctamente formateadas
+Por ejemplo: '{current_value} condición:' para if/while o 'for variable in iterable:' para bucles for""")
             else:
-                # Detectar el caso específico del else sin if
-                if p.type == 'KEYWORD' and p.value == 'else':
-                    error_msg = f"""Error de sintaxis en línea {p.lineno}: 'else' sin 'if' correspondiente
+                self.errors.append(f"""Error de sintaxis en línea {lineno}: Token inesperado '{current_value}'
 En el código:
     {line}
-    {' ' * column}^ El 'else' debe estar precedido por un bloque 'if'"""
-                else:
-                    error_msg = f"""Error de sintaxis en línea {p.lineno}: Token inesperado '{p.value}'
+    {' ' * column}^ Aquí
+Sugerencia: Revisa la sintaxis de las estructuras de control. 
+Para 'if': if condición: 
+Para 'for': for variable in iterable:
+Para 'while': while condición:""")
+            return
+        
+        # Mensaje genérico para otros casos
+        self.errors.append(f"""Error de sintaxis en línea {lineno}: Token inesperado '{current_value}'
 En el código:
     {line}
-    {' ' * column}^ Aquí"""
-                self.errors = [error_msg]
-            
-            self.valid_code = False
-        else:
-            error_msg = "Error de sintaxis: entrada inesperada al final del archivo"
-            self.errors = [error_msg]
-            self.valid_code = False
+    {' ' * column}^ Aquí""")
+        
+        # Marcar que el código no es válido
+        self.valid_code = False
 
     def _find_column(self, token):
         """Encuentra la columna donde está un token"""

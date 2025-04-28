@@ -193,6 +193,11 @@ class IfStmt(Statement):
         self.then_branch = then_branch
         self.else_branch = else_branch
 
+class WhileStmt(Statement):
+    def __init__(self, condition, body):
+        self.condition = condition
+        self.body = body
+
 class ForStmt(Statement):
     def __init__(self, variable, iterable, body):
         self.variable = variable  # Nombre de la variable iteradora
@@ -260,7 +265,11 @@ def print_ast(node, indent=0):
     
     elif isinstance(node, FunctionDef):
         print(f"{prefix}FunctionDef: {node.name}")
-        print(f"{prefix}  Parameters: {[f'{p.name}: {p.type.name if p.type else "any"}' for p in node.params]}")
+        params_str = []
+        for p in node.params:
+            type_name = p.type.name if p.type else "any"
+            params_str.append(f"{p.name}: {type_name}")
+        print(f"{prefix}  Parameters: {params_str}")
         print(f"{prefix}  Return Type: {node.return_type}")
         print(f"{prefix}  Body:")
         for stmt in node.body:
@@ -278,34 +287,34 @@ def print_ast(node, indent=0):
         print_ast(node.value, 0)
         print()  # Nueva línea después del valor
     
-    elif isinstance(node, BinaryExpr):
-        print(f"{prefix}BinaryExpr: {node.operator}")
-        print(f"{prefix}  Left:", end=" ")
-        print_ast(node.left, 0)
-        print()
-        print(f"{prefix}  Right:", end=" ")
-        print_ast(node.right, 0)
-        print()
+    elif isinstance(node, ExpressionStmt):
+        print(f"{prefix}ExpressionStmt:")
+        if hasattr(node, 'expression'):
+            print(f"{prefix}  Expression:", end=" ")
+            print_ast(node.expression, 0)
+            print()
     
     elif isinstance(node, CallExpr):
-        print(f"{prefix}Call: {node.callee.name}")
-        print(f"{prefix}  Arguments:")
-        for arg in node.arguments:
-            print_ast(arg, indent + 2)
-    
-    elif isinstance(node, Identifier):
-        print(f"Identifier({node.name})", end="")
-    
-    elif isinstance(node, Literal):
-        if isinstance(node.value, str):
-            print(f"Literal(\"{node.value}\": {node.type_name})", end="")
+        if hasattr(node, 'callee') and hasattr(node.callee, 'name'):
+            print(f"CallExpr: {node.callee.name}(", end="")
+            args = []
+            for arg in node.arguments:
+                if isinstance(arg, Literal):
+                    args.append(f"{arg.value}")
+                elif isinstance(arg, Identifier):
+                    args.append(f"{arg.name}")
+                else:
+                    args.append(str(arg))
+            print(", ".join(args), end="")
+            print(")")
         else:
-            print(f"Literal({node.value}: {node.type_name})", end="")
+            print(f"CallExpr: <unknown>")
     
     elif isinstance(node, IfStmt):
-        print(f"{prefix}If:")
-        print(f"{prefix}  Condition:")
-        print_ast(node.condition, indent + 2)
+        print(f"{prefix}IfStmt:")
+        print(f"{prefix}  Condition:", end=" ")
+        print_ast(node.condition, 0)
+        print()
         print(f"{prefix}  Then:")
         for stmt in node.then_branch:
             print_ast(stmt, indent + 2)
@@ -315,16 +324,40 @@ def print_ast(node, indent=0):
                 print_ast(stmt, indent + 2)
     
     elif isinstance(node, ForStmt):
-        print(f"{prefix}For:")
-        print(f"{prefix}  Variable:", end=" ")
-        print_ast(node.variable, 0)
-        print()
+        print(f"{prefix}ForStmt:")
+        print(f"{prefix}  Variable: {node.variable.name}")
         print(f"{prefix}  Iterable:", end=" ")
         print_ast(node.iterable, 0)
         print()
         print(f"{prefix}  Body:")
         for stmt in node.body:
             print_ast(stmt, indent + 2)
+    
+    elif isinstance(node, WhileStmt):
+        print(f"{prefix}WhileStmt:")
+        print(f"{prefix}  Condition:", end=" ")
+        print_ast(node.condition, 0)
+        print()
+        print(f"{prefix}  Body:")
+        for stmt in node.body:
+            print_ast(stmt, indent + 2)
+    
+    elif isinstance(node, BinaryExpr):
+        print(f"BinaryExpr: {node.operator}")
+        print(f"{prefix}  Left:", end=" ")
+        print_ast(node.left, 0)
+        print()
+        print(f"{prefix}  Right:", end=" ")
+        print_ast(node.right, 0)
+    
+    elif isinstance(node, Literal):
+        if hasattr(node, 'type_name'):
+            print(f"Literal({repr(node.value)}: {node.type_name})", end="")
+        else:
+            print(f"Literal({repr(node.value)})", end="")
+    
+    elif isinstance(node, Identifier):
+        print(f"Identifier({node.name})", end="")
     
     else:
         print(f"{prefix}Unknown node type: {type(node)}") 

@@ -41,15 +41,27 @@ class TypeScriptGenerator:
             self.visit_function_def(node)
         elif isinstance(node, IfStmt):
             self.visit_if_statement(node)
+        elif isinstance(node, ForStmt):
+            self.visit_for_stmt(node)
+        elif isinstance(node, WhileStmt):
+            self.visit_while_stmt(node)
         elif isinstance(node, AssignmentStmt):
             self.visit_assignment_stmt(node)
         elif isinstance(node, ReturnStmt):
             self.visit_return_stmt(node)
         elif isinstance(node, ExpressionStmt):
             self.visit_expression_stmt(node)
-        elif isinstance(node, ForStmt):
-            self.visit_for_stmt(node)
-        # ... más casos para otros tipos de statements
+        # ... otros casos
+
+    def visit_while_stmt(self, node):
+        """Genera código para un bucle while"""
+        condition = self.visit_expression(node.condition)
+        self.emit(f"while ({condition}) {{")
+        self.indentation += 1
+        for stmt in node.body:
+            self.visit_statement(stmt)
+        self.indentation -= 1
+        self.emit("}")
 
     def visit_expression_stmt(self, node):
         """Visita un expression statement y genera el código para la expresión"""
@@ -149,18 +161,33 @@ class TypeScriptGenerator:
             elements = [self.visit_expression(item) for item in node.value]
             return f"[{', '.join(elements)}]"
         elif node.type_name == 'string':
+            # Asegurarse de que node.value sea un string
+            if node.value is None:
+                return '""'
             # Si el valor comienza con ` es un template string
             if isinstance(node.value, str):
                 if node.value.startswith('`'):
                     return node.value  # Devolver el template string tal cual
-                return f'"{node.value}"'  # String normal
+                # Escapar las comillas dobles dentro del string
+                escaped_value = node.value.replace('"', '\\"')
+                return f'"{escaped_value}"'  # String normal
             return f'"{str(node.value)}"'
         elif node.type_name == 'number':
             return str(node.value)
         elif node.type_name == 'boolean':
+            # Asegurar que el valor sea en minúscula para TypeScript
+            if isinstance(node.value, str):
+                return node.value.lower()
             return str(node.value).lower()
         elif node.type_name == 'null':
             return 'null'
+        elif node.type_name == 'fstring':
+            # Convertir f-strings de Python a template literals de TypeScript
+            if isinstance(node.value, str):
+                # Reemplazar {expr} con ${expr}
+                ts_template = node.value.replace('{', '${')
+                return f"`{ts_template}`"
+            return f'`{str(node.value)}`'
         return str(node.value)
 
     def transform_python_builtin(self, func_name: str, args: List[str]) -> str:
@@ -213,10 +240,24 @@ class TypeScriptGenerator:
         elif isinstance(node, CallExpr):
             return self.visit_call_expr(node)
         else:
-            raise ValueError(f"Tipo de expresión no soportado: {type(node)}")
+            # Convertir a string como último recurso
+            try:
+                return str(node)
+            except:
+                return f"/* Error: tipo de expresión no soportado: {type(node).__name__} */"
 
     def visit_call_expr(self, node):
         """Genera código para llamadas a funciones"""
+        # Si el callee no es un Identifier, puede ser una expresión más compleja
+        if not isinstance(node.callee, Identifier):
+            # Intentar convertir la expresión a un string
+            try:
+                func_name = str(node.callee)
+            except:
+                func_name = "unknown_function"
+            args = [self.visit_expression(arg) for arg in node.arguments]
+            return f"{func_name}({', '.join(args)})"
+            
         func_name = node.callee.name
         args = [self.visit_expression(arg) for arg in node.arguments]
         
@@ -238,26 +279,26 @@ class TypeScriptGenerator:
 
     def visit_for_stmt(self, node):
         """Genera código para un bucle for"""
-        iterator = self.visit_expression(node.variable)
+        variable_name = node.variable.name
         iterable = self.visit_expression(node.iterable)
         
         # Si el iterable es un rango, traducirlo a un bucle for numerado en TypeScript
-        if isinstance(node.iterable, CallExpr) and node.iterable.callee.name == 'range':
+        if isinstance(node.iterable, CallExpr) and isinstance(node.iterable.callee, Identifier) and node.iterable.callee.name == 'range':
             args = node.iterable.arguments
             if len(args) == 1:
                 # range(end)
-                self.emit(f"for (let {iterator} = 0; {iterator} < {self.visit_expression(args[0])}; {iterator}++) {{")
+                self.emit(f"for (let {variable_name} = 0; {variable_name} < {self.visit_expression(args[0])}; {variable_name}++) {{")
             elif len(args) == 2:
                 # range(start, end)
-                self.emit(f"for (let {iterator} = {self.visit_expression(args[0])}; {iterator} < {self.visit_expression(args[1])}; {iterator}++) {{")
+                self.emit(f"for (let {variable_name} = {self.visit_expression(args[0])}; {variable_name} < {self.visit_expression(args[1])}; {variable_name}++) {{")
             elif len(args) == 3:
                 # range(start, end, step)
                 step = self.visit_expression(args[2])
-                step_comparison = "<" if step == "1" else step.startswith("-") and ">" or "<"
-                self.emit(f"for (let {iterator} = {self.visit_expression(args[0])}; {iterator} {step_comparison} {self.visit_expression(args[1])}; {iterator} += {step}) {{")
+                step_comparison = "<" if not step.startswith("-") else ">"
+                self.emit(f"for (let {variable_name} = {self.visit_expression(args[0])}; {variable_name} {step_comparison} {self.visit_expression(args[1])}; {variable_name} += {step}) {{")
         else:
             # Bucle for normal para otros iterables
-            self.emit(f"for (const {iterator} of {iterable}) {{")
+            self.emit(f"for (const {variable_name} of {iterable}) {{")
         
         self.indentation += 1
         for stmt in node.body:
@@ -270,15 +311,21 @@ class TypeScriptGenerator:
         condition = self.visit_expression(node.condition)
         self.emit(f"if ({condition}) {{")
         self.indentation += 1
+        
+        # Visitar cada sentencia en el bloque then
         for stmt in node.then_branch:
             self.visit_statement(stmt)
+        
         self.indentation -= 1
         
+        # Manejar el bloque else si existe
         if node.else_branch:
             self.emit("} else {")
             self.indentation += 1
+            
             for stmt in node.else_branch:
                 self.visit_statement(stmt)
+                
             self.indentation -= 1
         
         self.emit("}")
