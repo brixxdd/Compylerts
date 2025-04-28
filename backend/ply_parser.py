@@ -33,6 +33,9 @@ class PLYParser:
         self.valid_code = True
         self.symbol_table = SymbolTable()
         self.semantic_errors = []
+        self.current_scope = None
+        self.indent_level = 0  # Añadido para rastrear el nivel de indentación actual
+        self.function_contexts = []  # Pila para rastrear contextos de función
     
     # ======================================================================
     # REGLAS BNF PARA EL LENGUAJE
@@ -41,8 +44,13 @@ class PLYParser:
     # <program> ::= <statement_list>
     def p_program(self, p):
         '''program : statement_list'''
-        # Primero procesar todas las definiciones de funciones
-        self.symbol_table = SymbolTable()  # Reiniciar tabla de símbolos
+        # Guardar las funciones pre-registradas
+        pre_registered_functions = set(self.user_defined_functions)
+        known_functions = list(self.known_functions)
+        
+        # Reiniciar tabla de símbolos pero mantener las funciones pre-registradas
+        self.symbol_table = SymbolTable()
+        
         # Primera pasada: registrar todas las funciones
         if p[1]:
             for stmt in p[1]:
@@ -55,13 +63,20 @@ class PLYParser:
                         return_type=stmt.return_type
                     )
                     self.symbol_table.define(func_symbol)
+                    # Añadir a funciones conocidas si no estaba ya
+                    if stmt.name not in pre_registered_functions:
+                        self.user_defined_functions.add(stmt.name)
+                    if stmt.name not in known_functions:
+                        self.known_functions.append(stmt.name)
+        
         # Segunda pasada: verificar el resto de las referencias
         if p[1]:
             for stmt in p[1]:
                 if isinstance(stmt, CallExpr):
-                    self._check_function_call(stmt, p.lineno)
+                    self._check_function_call(stmt, p.lineno(0) if hasattr(p, 'lineno') else 0)
                 elif isinstance(stmt, Identifier):
-                    self._check_variable_reference(stmt, p.lineno)
+                    self._check_variable_reference(stmt, p.lineno(0) if hasattr(p, 'lineno') else 0)
+        
         p[0] = Program(p[1] if p[1] else [])
     
     # <statement_list> ::= <statement> | <statement_list> <statement>
@@ -161,6 +176,36 @@ class PLYParser:
         '''return_statement : KEYWORD expression NEWLINE
                            | KEYWORD NEWLINE'''
         if p[1] == 'return':
+            # Verificar si estamos en contexto de función
+            # Para esta versión simplificada, asumiremos que cualquier return con indentación
+            # está dentro de una función
+            is_in_function = self.indent_level > 0
+            
+            for symbol in getattr(self.symbol_table, 'symbols', []):
+                if getattr(symbol, 'kind', None) == 'function':
+                    is_in_function = True
+                    break
+            
+            # Añadir verificación para comprobar si estamos dentro de una definición de función
+            if not is_in_function:
+                if hasattr(p, 'lexer') and hasattr(p.lexer, 'last_tokens'):
+                    for token in p.lexer.last_tokens:
+                        if token.type == 'KEYWORD' and token.value == 'def':
+                            is_in_function = True
+                            break
+            
+            if not is_in_function:
+                lineno = p.lineno(1) if hasattr(p, 'lineno') else 0
+                line = self.source_lines[lineno - 1] if lineno <= len(self.source_lines) else ""
+                column = self._find_column(p)
+                self.errors.append(f"""Error semántico en línea {lineno}: La sentencia 'return' debe estar dentro de una función
+En el código:
+    {line}
+    {' ' * column}^ No se puede usar 'return' fuera de una función
+Sugerencia: Asegúrate de que la sentencia 'return' esté dentro de la definición de una función.""")
+                p[0] = None
+                return
+            
             if len(p) > 3:
                 p[0] = ReturnStmt(p[2])
             else:
@@ -206,6 +251,13 @@ class PLYParser:
                 return_type=return_type
             )
             self.symbol_table.define(func_symbol)
+            # Añadir la función a los símbolos conocidos
+            self.user_defined_functions.add(name)
+            self.known_functions.append(name)
+            
+            # Marcar que estamos en un contexto de función para reconocer returns
+            self.indent_level = 4
+            
             p[0] = FunctionDef(name, params, return_type, body)
     
     # <parameter_list> ::= <parameter> | <parameter_list> COMMA <parameter>
@@ -585,6 +637,18 @@ class PLYParser:
         current_token = p.type if hasattr(p, 'type') else "?"
         current_value = p.value if hasattr(p, 'value') else "?"
         
+        # Detección de comas faltantes
+        if current_token == 'STRING' and hasattr(p.lexer, 'last_tokens') and len(p.lexer.last_tokens) > 0:
+            prev_token = p.lexer.last_tokens[-1]
+            if prev_token.type == 'STRING':
+                self.errors.append(f"""Error de sintaxis en línea {lineno}: Falta una coma entre strings
+En el código:
+    {line}
+    {' ' * column}^ Falta una coma entre cadenas de texto
+Sugerencia: Añade una coma entre los elementos:
+    ["{prev_token.value}", "{current_value}"]""")
+                return
+                
         # Contexto específico para mensajes de error más informativos
         if current_token == 'COLON' and hasattr(p.lexer, 'last_tokens') and len(p.lexer.last_tokens) > 0:
             prev_token = p.lexer.last_tokens[-1]
@@ -601,7 +665,8 @@ En el código:
             self.errors.append(f"""Error de indentación en línea {lineno}
 En el código:
     {line}
-    {' ' * column}^ Indentación incorrecta""")
+    {' ' * column}^ Indentación incorrecta
+Sugerencia: Usa 4 espacios para cada nivel de indentación""")
             return
         
         # Detectar problemas con estructuras de control
@@ -663,9 +728,20 @@ En el código:
     def _check_function_call(self, call_expr, line):
         """Verifica una llamada a función"""
         func_name = call_expr.callee.name
-        error_msg = f"Error semántico en línea {line}: Función '{func_name}' no está definida"
         
-        if not self.symbol_table.resolve(func_name) and func_name not in ['print', 'input', 'len']:
+        # No verificar funciones built-in como print, input, len
+        builtin_functions = ['print', 'input', 'len', 'range', 'int', 'str', 'float']
+        if func_name in builtin_functions:
+            return
+            
+        # SOLUCIÓN: Verificar si la función ya está pre-registrada
+        if func_name in self.user_defined_functions or func_name in self.known_functions:
+            return
+            
+        # Verificar si la función está definida en nuestra tabla de símbolos o es conocida
+        symbol = self.symbol_table.resolve(func_name)
+        if not symbol and func_name not in self.user_defined_functions and func_name not in self.known_functions:
+            error_msg = f"Error semántico en línea {line}: Función '{func_name}' no está definida"
             # Verificar si este error ya ha sido reportado
             if error_msg not in self.semantic_errors:
                 self.semantic_errors.append(error_msg)
@@ -692,23 +768,103 @@ En el código:
         self.source_lines = text.splitlines()
         self.errors = []
         self.semantic_errors = []
-        self.symbol_table = SymbolTable()
+        
+        # No reiniciar la tabla de símbolos completamente para preservar las funciones pre-registradas
+        if not hasattr(self, 'symbol_table') or self.symbol_table is None:
+            self.symbol_table = SymbolTable()
         
         try:
+            # Asegurar que estamos en el nivel de indentación correcto para funciones definidas
+            has_functions = 'def ' in text
+            if has_functions and self.function_contexts:
+                self.indent_level = 4  # Nivel típico para una definición de función
+            
             # Si el lexer tiene errores, no continuar con el parsing
-            if not lexer.valid_code or lexer.errors:
+            if lexer and (not lexer.valid_code or lexer.errors):
                 self.errors.extend(lexer.errors)
                 return None
                 
-            ast = self.parser.parse(input=text, lexer=lexer)
+            # Si no se proporciona un lexer, crear uno nuevo
+            if not lexer:
+                lexer = PLYLexer(text)
+                # Asegurarse de que no haya errores léxicos
+                while lexer.token():
+                    pass
+                if not lexer.valid_code or lexer.errors:
+                    self.errors.extend(lexer.errors)
+                    return None
+                # Reiniciar el lexer para el parsing
+                lexer = PLYLexer(text)
             
+            # Parsear el texto
+            ast = self.parser.parse(input=text, lexer=lexer.lexer)
+            
+            # Comprobar si hay errores de sintaxis
             if self.errors:
+                return None
+                
+            # Comprobar si hay errores semánticos
+            if self.semantic_errors:
+                self.errors.extend(self.semantic_errors)
                 return None
             
             return ast
         except Exception as e:
             self.errors.append(f"Error inesperado: {str(e)}")
             return None
+
+    def _is_in_function_context(self):
+        """Determina si el código actual está dentro de una función."""
+        # Verificar si estamos dentro de un bloque de función basado en la pila de contextos
+        if self.function_contexts:
+            return True
+        
+        # Verificar basado en la indentación y tabla de símbolos
+        if self.indent_level > 0:
+            # Buscar en la tabla de símbolos para funciones definidas
+            for symbol in self.symbol_table.symbols:
+                if symbol.kind == 'function':
+                    return True
+        
+        return False
+        
+    def _enter_function_context(self, function_name):
+        """Registra la entrada a un bloque de función."""
+        self.function_contexts.append(function_name)
+        
+    def _exit_function_context(self):
+        """Registra la salida de un bloque de función."""
+        if self.function_contexts:
+            return self.function_contexts.pop()
+        return None
+        
+    def _update_indent_level(self, p):
+        """Actualiza el nivel de indentación basado en tokens INDENT/DEDENT."""
+        if hasattr(p, 'lexer') and hasattr(p.lexer, 'last_tokens'):
+            for token in p.lexer.last_tokens:
+                if token.type == 'INDENT':
+                    self.indent_level += 1
+                elif token.type == 'DEDENT':
+                    self.indent_level = max(0, self.indent_level - 1)
+                    # Si salimos de un nivel de indentación, podríamos estar saliendo de una función
+                    if self.indent_level == 0 and self.function_contexts:
+                        self._exit_function_context()
+
+    def _check_variable_reference(self, var_node, line):
+        """Verifica una referencia a variable"""
+        if not isinstance(var_node, Identifier):
+            return
+            
+        var_name = var_node.name
+        # No verificar palabras clave o literales booleanos/None
+        if var_name in self.keywords or var_name in ['True', 'False', 'None']:
+            return
+            
+        # Verificar si la variable está definida
+        if not self.symbol_table.resolve(var_name):
+            error_msg = f"Error semántico en línea {line}: Variable '{var_name}' no está definida"
+            if error_msg not in self.semantic_errors:
+                self.semantic_errors.append(error_msg)
 
 def print_ast(node, indent=0):
     """Imprime el AST de forma legible"""

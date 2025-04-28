@@ -17,18 +17,57 @@ def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
         print("Inicializando lexer...")
         lexer = PLYLexer(source_code)
         
+        # Procesar todos los tokens para detectar errores léxicos
+        tokens = []
+        while True:
+            token = lexer.token()
+            if not token:
+                break
+            tokens.append(token)
+        
         # Si hay errores en el lexer o el código no es válido, retornar los errores inmediatamente
-        if not lexer.valid_code:
+        if not lexer.valid_code or lexer.errors:
             return None, lexer.errors
         
         print("Inicializando parser...")
         parser = PLYParser(source_code)
+        
+        # SOLUCIÓN: Pre-registrar todas las funciones definidas en el código
+        # y usar una estrategia diferente - convertir directamente a TypeScript para casos simples
+        function_found = False
+        for i, line in enumerate(source_code.splitlines()):
+            stripped_line = line.strip()
+            if stripped_line.startswith('def '):
+                try:
+                    func_name = stripped_line.split()[1].split('(')[0]
+                    parser.user_defined_functions.add(func_name)
+                    parser.known_functions.append(func_name)
+                    # Marcar que estamos en un contexto de función
+                    parser.function_contexts.append(func_name)
+                    function_found = True
+                except:
+                    pass
+        
+        # Si hay funciones definidas, usar la conversión simple en lugar del parser
+        if function_found:
+            typescript_code = convert_simple_function(source_code)
+            if typescript_code:
+                return typescript_code, []
+            else:
+                # Si devuelve None, es porque hubo un error en la conversión
+                return None, ["Error sintáctico: Hay problemas en la estructura del código. Revisa las llamadas a funciones por posibles comas sueltas."]
         
         # Verificar si es código con estructuras de control
         has_control_structures = False
         if re.search(r'\b(if|for|while)\b.*:', source_code) or 'else:' in source_code:
             has_control_structures = True
             print("Código con estructuras de control detectado")
+        
+        # Verificar si hay definiciones de funciones
+        has_functions = 'def ' in source_code
+        if has_functions:
+            # Asignar nivel de indentación para funciones
+            parser.indent_level = 4
         
         if has_control_structures:
             # Usar la conversión directa para estructuras de control
@@ -38,8 +77,14 @@ def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
         
         # Parsear el código
         print("Parseando código...")
-        ast = parser.parser.parse(input=source_code, lexer=lexer.lexer)
+        # Crear un nuevo lexer para el parsing real
+        new_lexer = PLYLexer(source_code)
+        ast = parser.parse(source_code, new_lexer)
         print(f"AST generado: {ast is not None}")
+        
+        # Verificar si hay errores semánticos
+        if parser.semantic_errors:
+            return None, parser.semantic_errors
         
         # Filtrar errores específicos relacionados con print en bloques
         filtered_errors = []
@@ -248,6 +293,176 @@ def convert_simple_expressions(source_code: str) -> str:
     
     return '\n'.join(typescript_lines)
 
+def convert_simple_function(source_code: str) -> str:
+    """Convierte definiciones de funciones simples de Python a TypeScript"""
+    lines = source_code.splitlines()
+    ts_lines = []
+    
+    # Verificar si hay errores de coma suelta
+    for i, line in enumerate(lines):
+        if '(' in line and ')' in line and ',' in line:
+            # Posible llamada a función con argumentos
+            open_paren_idx = line.index('(')
+            close_paren_idx = line.rindex(')')
+            if open_paren_idx < close_paren_idx:
+                args_str = line[open_paren_idx+1:close_paren_idx]
+                # Verificar coma suelta al final de los argumentos
+                if args_str.strip().endswith(','):
+                    # Error: hay una coma suelta
+                    print(f"""Error sintáctico en línea {i+1}: Coma suelta en argumentos de función
+En el código:
+    {line}
+    {' ' * (line.rindex(',', open_paren_idx, close_paren_idx) + 1)}^ No se permite una coma seguida de paréntesis de cierre
+Sugerencia: Elimina la coma o añade otro argumento después de la coma.""")
+                    # Devolver None para indicar error y detener la compilación
+                    return None
+                
+                # Verificar comas consecutivas en los argumentos
+                parts = args_str.split(',')
+                for j in range(len(parts) - 1):
+                    if parts[j].strip() == '' and parts[j+1].strip() == '':
+                        comma_position = open_paren_idx + 1 + args_str.find(',,')
+                        print(f"""Error sintáctico en línea {i+1}: Comas consecutivas en argumentos de función
+En el código:
+    {line}
+    {' ' * comma_position}^ No se permiten comas consecutivas
+Sugerencia: Elimina una de las comas o añade un argumento entre ellas.""")
+                        return None
+                    
+                # Verificar si hay argumentos vacíos (ejemplo: func(arg1, , arg2))
+                for j, part in enumerate(parts):
+                    if part.strip() == '' and j > 0 and j < len(parts) - 1:
+                        # Calcular la posición aproximada de la coma problemática
+                        pos = 0
+                        for k in range(j):
+                            pos += len(parts[k]) + 1  # +1 por la coma
+                        comma_position = open_paren_idx + 1 + pos
+                        print(f"""Error sintáctico en línea {i+1}: Argumento vacío en llamada a función
+En el código:
+    {line}
+    {' ' * comma_position}^ Se esperaba un argumento aquí
+Sugerencia: Elimina la coma extra o añade un argumento válido.""")
+                        return None
+    
+    in_function_def = False
+    function_indent = 0
+    
+    # Mapeo de tipos Python a TypeScript
+    type_mapping = {
+        'int': 'number',
+        'str': 'string',
+        'float': 'number',
+        'bool': 'boolean',
+        'list': 'any[]',
+        'dict': 'Record<string, any>',
+        'None': 'void'
+    }
+    
+    for line in lines:
+        # Manejar líneas vacías y comentarios
+        if not line.strip():
+            ts_lines.append(line)
+            continue
+        elif line.strip().startswith('#'):
+            # Si no estamos dentro de una función, mantener el comentario
+            if not in_function_def:
+                ts_lines.append(line)
+            continue
+            
+        if line.strip().startswith('def '):
+            # Definición de función
+            in_function_def = True
+            function_indent = len(line) - len(line.lstrip())
+            
+            # Extraer nombre de la función, parámetros y tipo de retorno
+            parts = line.strip().split('(')
+            func_name = parts[0].split()[1]
+            
+            params_and_return = parts[1].split(')')
+            params_str = params_and_return[0]
+            
+            # Procesar parámetros
+            params = []
+            if params_str.strip():
+                for param in params_str.split(','):
+                    param = param.strip()
+                    if ':' in param:
+                        param_name, param_type = param.split(':')
+                        param_name = param_name.strip()
+                        param_type = param_type.strip()
+                        ts_type = type_mapping.get(param_type, 'any')
+                        params.append(f"{param_name}: {ts_type}")
+                    else:
+                        params.append(f"{param}: any")
+            
+            # Procesar tipo de retorno
+            return_type = 'void'
+            if '->' in params_and_return[1]:
+                return_type_str = params_and_return[1].split('->')[1].strip().split(':')[0].strip()
+                return_type = type_mapping.get(return_type_str, 'any')
+            
+            # Construir declaración de función TypeScript
+            ts_lines.append(f"function {func_name}({', '.join(params)}): {return_type} {{")
+            
+        elif in_function_def:
+            # Contenido de la función
+            line_indent = len(line) - len(line.lstrip())
+            
+            if line_indent <= function_indent and line.strip():
+                # Salimos de la función
+                ts_lines.append('}')
+                in_function_def = False
+                
+                # Procesar esta línea de nuevo, ya no estamos en la función
+                if 'print(' in line:
+                    # Convertir print a console.log
+                    indentation = ' ' * line_indent
+                    args = line.strip()[line.strip().index('(')+1:line.strip().rindex(')')]
+                    ts_lines.append(f"{indentation}console.log({args});")
+                elif '=' in line and not any(line.strip().startswith(x) for x in ['if ', 'for ', 'while ']):
+                    # Asignación de variable
+                    indentation = ' ' * line_indent
+                    ts_lines.append(f"{indentation}let {line.strip()};")
+                else:
+                    ts_lines.append(line)
+            else:
+                # Dentro de la función
+                if 'return ' in line:
+                    # Declaración return
+                    indentation = ' ' * line_indent
+                    return_expr = line.strip()[7:]  # Quitar "return "
+                    ts_lines.append(f"{indentation}return {return_expr};")
+                elif 'print(' in line:
+                    # Convertir print a console.log
+                    indentation = ' ' * line_indent
+                    args = line.strip()[line.strip().index('(')+1:line.strip().rindex(')')]
+                    ts_lines.append(f"{indentation}console.log({args});")
+                elif '=' in line and not any(line.strip().startswith(x) for x in ['if ', 'for ', 'while ']):
+                    # Asignación de variable
+                    indentation = ' ' * line_indent
+                    ts_lines.append(f"{indentation}let {line.strip()};")
+                else:
+                    ts_lines.append(line)
+        else:
+            # Fuera de cualquier función
+            if 'print(' in line:
+                # Convertir print a console.log
+                indentation = ' ' * (len(line) - len(line.lstrip()))
+                args = line.strip()[line.strip().index('(')+1:line.strip().rindex(')')]
+                ts_lines.append(f"{indentation}console.log({args});")
+            elif '=' in line and not any(line.strip().startswith(x) for x in ['if ', 'for ', 'while ']):
+                # Asignación de variable
+                indentation = ' ' * (len(line) - len(line.lstrip()))
+                ts_lines.append(f"{indentation}let {line.strip()};")
+            else:
+                ts_lines.append(line)
+    
+    # Cerrar la última función si es necesario
+    if in_function_def:
+        ts_lines.append('}')
+    
+    return '\n'.join(ts_lines)
+
 def main():
     print("=== Compilador Python a TypeScript ===")
     print("Ingresa tu código Python (presiona Ctrl+D en Linux/Mac o Ctrl+Z en Windows para finalizar):")
@@ -269,6 +484,9 @@ def main():
         print(f"\n❌ Error al leer el código: {str(e)}")
         return
     
+    # Verificar si el código incluye definiciones de funciones
+    has_functions = 'def ' in source_code
+    
     # Compilar el código
     typescript_code, errors = compile_to_typescript(source_code)
     
@@ -277,6 +495,25 @@ def main():
         print("\n❌ Errores encontrados:")
         for error in errors:
             print(error)
+            
+        # Sugerencias específicas para errores comunes
+        num_strings_unclosed = sum(1 for error in errors if "String sin cerrar" in error)
+        num_missing_commas = sum(1 for error in errors if "Falta una coma" in error)
+        num_return_errors = sum(1 for error in errors if "return" in error and "función" in error)
+        num_undefined_funcs = sum(1 for error in errors if "Función" in error and "no está definida" in error)
+        
+        if num_strings_unclosed > 0:
+            print("\nConsejo: Asegúrate de cerrar todas las cadenas de texto con el mismo tipo de comillas con que las abriste.")
+        
+        if num_missing_commas > 0:
+            print("\nConsejo: Revisa si hay elementos consecutivos que requieren una coma entre ellos, como en listas y diccionarios.")
+        
+        if num_return_errors > 0:
+            print("\nConsejo: Las sentencias 'return' solo pueden aparecer dentro de funciones.")
+            
+        if num_undefined_funcs > 0:
+            print("\nConsejo: Asegúrate de que todas las funciones que usas estén definidas antes de llamarlas.")
+            
         return
     
     # Mostrar el código TypeScript generado

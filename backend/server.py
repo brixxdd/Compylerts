@@ -3,6 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from ply_lexer import PLYLexer
 from ply_parser import PLYParser
+from typescript_generator import TypeScriptGenerator
+from main import compile_to_typescript
+import re
+import sys
+import io
 
 app = FastAPI()
 
@@ -26,21 +31,37 @@ async def compile_code(request: CompileRequest):
         if not code.endswith('\n'):
             code = code + '\n'
 
+        # Capturar la salida de la compilación
+        old_stdout = sys.stdout
+        redirected_output = io.StringIO()
+        sys.stdout = redirected_output
+
+        # Ejecutar el compilador como lo haría main.py
+        typescript_code, errors = compile_to_typescript(code)
+        
+        # Restaurar stdout
+        sys.stdout = old_stdout
+        
+        # Obtener la salida capturada
+        output_text = redirected_output.getvalue()
+        output_lines = output_text.splitlines()
+        
+        # Filtrar líneas de DEBUG si es necesario
+        filtered_output = [line for line in output_lines if not line.startswith("DEBUG")]
+
         response = {
-            "success": True,
-            "output": [],
-            "errors": [],
+            "success": not errors,
+            "output": filtered_output,
+            "errors": errors or [],
             "tokens": [],
-            "phase": "lexical"  # Empezamos con fase léxica
+            "phase": "lexical" if errors and any("léxico" in e for e in errors) else 
+                    "syntactic" if errors and any("sintáctico" in e for e in errors) else
+                    "semantic" if errors else "success",
+            "typescript_code": typescript_code or ""
         }
 
-        # Lista para almacenar todos los errores detectados
-        all_errors = []
-        
-        # Fase 1: Análisis Léxico
+        # Procesar tokens
         lexer = PLYLexer(code)
-        
-        # Recolectar tokens para mostrarlos
         tokens = []
         while True:
             tok = lexer.token()
@@ -52,115 +73,14 @@ async def compile_code(request: CompileRequest):
                 "line": tok.lineno
             }
             tokens.append(token_info)
-            response["output"].append(f"{tok.type}: {str(tok.value)}")
         
         response["tokens"] = tokens
-        
-        # Verificar si hay errores léxicos (incluyendo corchetes sin cerrar)
-        if lexer.errors:
-            response["success"] = False
-            
-            # Identificar si hay errores de corchetes
-            bracket_errors = [err for err in lexer.errors if "Corchete sin cerrar" in err]
-            if bracket_errors:
-                response["phase"] = "syntactic"  # Tratar como error sintáctico
-                all_errors.extend(bracket_errors)
-            else:
-                response["phase"] = "lexical"
-                all_errors.extend(lexer.errors)
-        
-        # Añadir verificación específica para corchetes sin cerrar
-        bracket_stack = []
-        line_number = 1
 
-        for i, char in enumerate(code):
-            if char == '[':
-                bracket_stack.append((line_number, i))
-            elif char == ']' and bracket_stack:
-                bracket_stack.pop()
-            elif char == '\n':
-                line_number += 1
+        # Extraer tipos inferidos si hay código TypeScript
+        if typescript_code:
+            inferred_types = extract_inferred_types(typescript_code)
+            response["inferred_types"] = inferred_types
 
-        # Reportar los corchetes sin cerrar
-        if bracket_stack:
-            response["success"] = False
-            response["phase"] = "syntactic"
-            
-            for line_no, pos in bracket_stack:
-                # Calcular la posición en la línea
-                lines = code.split('\n')
-                if 0 <= line_no - 1 < len(lines):
-                    line = lines[line_no - 1]
-                    column = pos - sum(len(l) + 1 for l in lines[:line_no - 1])
-                    
-                    error_msg = f"""Error sintáctico en línea {line_no}: Corchete sin cerrar
-En el código:
-    {line}
-    {' ' * column}^ Falta el corchete de cierre ']'
-Sugerencia: {line}]"""
-                    
-                    all_errors.append(error_msg)
-        
-        # Fase 2: Análisis Sintáctico y Semántico
-        parser = PLYParser()
-        result = parser.parse(code)
-        
-        # Verificar errores sintácticos
-        if parser.errors:
-            response["success"] = False
-            
-            # Verificar si hay errores semánticos mezclados con los sintácticos
-            semantic_errors = [err for err in parser.errors if "Error semántico" in err]
-            syntactic_errors = [err for err in parser.errors if "Error semántico" not in err]
-            
-            # Agregar errores sintácticos
-            if syntactic_errors:
-                response["phase"] = "syntactic"
-                all_errors.extend(syntactic_errors)
-            
-            # También agregar los errores semánticos si existen
-            if semantic_errors:
-                # Eliminar duplicados de errores semánticos
-                unique_semantic_errors = []
-                for err in semantic_errors:
-                    if err not in unique_semantic_errors:
-                        unique_semantic_errors.append(err)
-                all_errors.extend(unique_semantic_errors)
-        
-        # Verificar errores semánticos específicos
-        if parser.semantic_errors:
-            response["success"] = False
-            if not all_errors:  # Si no hay otros errores, establecer fase a semántica
-                response["phase"] = "semantic"
-            
-            # Eliminar duplicados entre semantic_errors y all_errors
-            unique_semantic_errors = []
-            for err in parser.semantic_errors:
-                if err not in all_errors and err not in unique_semantic_errors:
-                    unique_semantic_errors.append(err)
-            
-            all_errors.extend(unique_semantic_errors)
-        
-        # Guardar todos los errores en la respuesta
-        response["errors"] = all_errors
-        
-        # Agregar mensajes de salida según los errores
-        if all_errors:
-            # Determinar el tipo de encabezado basado en el contenido de los errores
-            if any("Error léxico" in err for err in all_errors):
-                response["output"].append("❌ Errores léxicos encontrados:")
-            elif any("Error sintáctico" in err for err in all_errors):
-                response["output"].append("❌ Errores sintácticos encontrados:")
-            elif any("Error semántico" in err for err in all_errors):
-                response["output"].append("❌ Errores semánticos encontrados:")
-            else:
-                response["output"].append("❌ Errores encontrados:")
-            
-            response["output"].extend(all_errors)
-        else:
-            response["output"].append("✅ No se encontraron errores")
-            response["output"].append("✅ Análisis completado sin errores")
-        
         return response
 
     except Exception as e:
@@ -168,9 +88,22 @@ Sugerencia: {line}]"""
             "success": False,
             "phase": "error",
             "errors": [str(e)],
-            "output": [],
+            "output": ["Error inesperado: " + str(e)],
             "tokens": []
         }
+
+def extract_inferred_types(typescript_code: str) -> dict:
+    """Extrae los tipos inferidos de las variables a partir del código TypeScript generado"""
+    inferred_types = {}
+    
+    # Buscar declaraciones de variables con tipos
+    pattern = r'let\s+(\w+):\s+(\w+(?:\[\])?)\s*='
+    matches = re.findall(pattern, typescript_code)
+    
+    for var_name, var_type in matches:
+        inferred_types[var_name] = var_type
+    
+    return inferred_types
 
 @app.post("/run-main")
 async def run_main(request: CompileRequest):
@@ -180,51 +113,33 @@ async def run_main(request: CompileRequest):
         if not code.endswith('\n'):
             code = code + '\n'
 
-        # Simular la ejecución de main.py
-        output_lines = [
-            "=== Análisis Léxico y Sintáctico con PLY ===",
-            "Ingresa tu código (presiona Ctrl+D en Linux/Mac o Ctrl+Z en Windows para finalizar):",
-            "--------------------------------------------------------------------------------"
-        ]
+        # Capturar la salida de la compilación
+        old_stdout = sys.stdout
+        redirected_output = io.StringIO()
+        sys.stdout = redirected_output
+
+        # Ejecutar el compilador directamente
+        typescript_code, errors = compile_to_typescript(code)
         
-        # Crear instancia del lexer
-        lexer = PLYLexer(code)
+        # Restaurar stdout
+        sys.stdout = old_stdout
         
-        # Agregar el código ingresado
-        output_lines.extend(code.split('\n'))
-        output_lines.append("")
-        
-        # Agregar tokens encontrados
-        output_lines.append("Tokens encontrados:")
-        output_lines.append("----------------------------------------")
-        
-        tokens = []
-        while True:
-            tok = lexer.token()
-            if not tok:
-                break
-            tokens.append(f"{tok.type}: {str(tok.value)}")
-        
-        output_lines.extend(tokens)
-        
-        # Agregar errores si existen
-        if lexer.errors:
-            output_lines.append("")
-            output_lines.append("❌ Errores léxicos:")
-            output_lines.extend(lexer.errors)
+        # Obtener la salida capturada
+        output_text = redirected_output.getvalue()
         
         return {
-            "success": not lexer.errors,
-            "terminal_output": output_lines
+            "success": not errors,
+            "errors": errors or [],
+            "typescript_code": typescript_code or "",
+            "output": output_text.splitlines()
         }
         
     except Exception as e:
         return {
             "success": False,
-            "terminal_output": [
-                "Error inesperado:",
-                str(e)
-            ]
+            "errors": [str(e)],
+            "typescript_code": "",
+            "output": ["Error inesperado: " + str(e)]
         }
 
 if __name__ == "__main__":

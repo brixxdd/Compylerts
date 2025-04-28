@@ -106,6 +106,10 @@ class PLYLexer:
         self.tokens_queue = []
         self.paren_stack = []  # Pila para rastrear paréntesis
         self.bracket_stack = []  # Nueva pila para rastrear corchetes
+        self.index = 0
+        self.previous_line = 1
+        self.previous_column = 0
+        self.max_tokens_history = 10  # Número máximo de tokens a mantener
     
     def t_STRING(self, t):
         r'(?<!f)("([^"\n]|\\")*"|\'([^\'\n]|\\\')*\')'
@@ -114,16 +118,18 @@ class PLYLexer:
         return t
 
     def t_UNCLOSED_STRING(self, t):
-        r'(?<!f)("([^"\n]|\\")*|\'([^\'\n]|\\\')*)'
+        r'(?<!f)("([^"\n]|\\")*((\n|$))|\'([^\'\n]|\\\')*((\n|$)))'
         # Si llegamos aquí, es porque encontramos un string que empieza con comilla pero no termina correctamente
         quote_type = '"' if t.value[0] == '"' else "'"
         content = t.value[1:]  # El contenido sin la comilla inicial
         error_msg = f"""Error léxico en línea {t.lexer.lineno}: String sin cerrar correctamente
 En el código:
     {self.source_lines[t.lexer.lineno - 1]}
-    {' ' * self._find_column(t)}^ String '{content}' comienza con {quote_type} pero no se cierra
-Sugerencia: Asegúrate de cerrar el string con la misma comilla ({quote_type}):
-    nombre = {quote_type}{content}{quote_type}"""
+    {' ' * self._find_column(t)}^ Falta cerrar el string con {quote_type}
+Sugerencia: El string debe terminar con la misma comilla con la que inicia.
+Para corregir este error, añade {quote_type} al final del string:
+    nombre = {quote_type}{content.strip()}{quote_type}
+También verifica si hay una coma faltante después del string."""
         self.errors.append(error_msg)
         self.valid_code = False
         # Avanzar hasta el final de la línea
@@ -214,33 +220,55 @@ En el código:
             self.lexer.last_token = tok
             self.lexer.last_tokens.append(tok)
             # Mantener solo los últimos 10 tokens
-            if len(self.last_tokens) > 10:
+            if len(self.last_tokens) > self.max_tokens_history:
                 self.last_tokens.pop(0)
-            if len(self.lexer.last_tokens) > 10:
+            if len(self.lexer.last_tokens) > self.max_tokens_history:
                 self.lexer.last_tokens.pop(0)
             
             return tok
         
-        tok = self.lexer.token()
-        if tok:
-            # Debug info
-            print(f"\nDEBUG TOKEN (from lexer):")
-            print(f"Token: {tok.type}")
-            print(f"Valor: {tok.value}")
-            print(f"Línea: {tok.lineno}")
+        try:
+            tok = self.lexer.token()
+            if tok:
+                # Debug info
+                print(f"\nDEBUG TOKEN (from lexer):")
+                print(f"Token: {tok.type}")
+                print(f"Valor: {tok.value}")
+                print(f"Línea: {tok.lineno}")
+                
+                # Verificar si hay una coma suelta (coma seguida inmediatamente de paréntesis de cierre)
+                if tok.type == 'COMMA':
+                    # Mirar el siguiente token sin consumirlo
+                    next_pos = self.lexer.lexpos
+                    next_char = self.lexer.lexdata[next_pos:next_pos+1] if next_pos < len(self.lexer.lexdata) else ''
+                    # Si después de una coma viene un paréntesis de cierre
+                    if next_char == ')':
+                        lineno = tok.lineno
+                        self.errors.append(f"""Error sintáctico en línea {lineno}: Coma suelta en argumentos de función
+En el código:
+    {self.source_lines[lineno - 1]}
+    {' ' * self._find_column(tok)}^ No se permite una coma seguida de paréntesis de cierre
+Sugerencia: Elimina la coma o añade otro argumento después de la coma.""")
+                        self.valid_code = False
+                
+                # Guardar este token
+                self.last_token = tok
+                self.last_tokens.append(tok)
+                self.lexer.last_token = tok
+                self.lexer.last_tokens.append(tok)
+                # Mantener solo los últimos 10 tokens
+                if len(self.last_tokens) > self.max_tokens_history:
+                    self.last_tokens.pop(0)
+                if len(self.lexer.last_tokens) > self.max_tokens_history:
+                    self.lexer.last_tokens.pop(0)
+                
+                return tok
+        except Exception as e:
+            # Si hay un error al procesar tokens, marcarlo como inválido
+            line_no = getattr(self.lexer, 'lineno', 0)
+            self.errors.append(f"Error léxico en línea {line_no}: {str(e)}")
+            self.valid_code = False
             
-            # Guardar este token
-            self.last_token = tok
-            self.last_tokens.append(tok)
-            self.lexer.last_token = tok
-            self.lexer.last_tokens.append(tok)
-            # Mantener solo los últimos 10 tokens
-            if len(self.last_tokens) > 10:
-                self.last_tokens.pop(0)
-            if len(self.lexer.last_tokens) > 10:
-                self.lexer.last_tokens.pop(0)
-            
-            return tok
         return None
 
     def t_ARROW(self, t):
