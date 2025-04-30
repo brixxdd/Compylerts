@@ -110,7 +110,106 @@ class PLYLexer:
         self.previous_line = 1
         self.previous_column = 0
         self.max_tokens_history = 10  # Número máximo de tokens a mantener
-    
+
+    def check_unclosed_delimiters(self):
+        """Verifica si hay delimitadores sin cerrar al final del análisis"""
+        # Verificar paréntesis sin cerrar
+        for line_no, pos in self.paren_stack:
+            line = self.source_lines[line_no - 1]
+            column = pos - sum(len(l) + 1 for l in self.source_lines[:line_no - 1])
+            self.errors.append(f"""Error sintáctico en línea {line_no}: Paréntesis de apertura sin cerrar
+En el código:
+    {line}
+    {' ' * column}^ Falta el paréntesis de cierre ')'""")
+            self.valid_code = False
+
+        # Verificar corchetes sin cerrar
+        for line_no, pos in self.bracket_stack:
+            line = self.source_lines[line_no - 1]
+            column = pos - sum(len(l) + 1 for l in self.source_lines[:line_no - 1])
+            self.errors.append(f"""Error sintáctico en línea {line_no}: Corchete de apertura sin cerrar
+En el código:
+    {line}
+    {' ' * column}^ Falta el corchete de cierre ']'""")
+            self.valid_code = False
+
+    def token(self):
+        """Método requerido por PLY para obtener el siguiente token"""
+        if self.tokens_queue:
+            token_type, token_value, lineno = self.tokens_queue.pop(0)
+            tok = lex.LexToken()
+            tok.type = token_type
+            tok.value = token_value
+            tok.lineno = lineno
+            tok.lexpos = 0
+            
+            # Debug info
+            print(f"\nDEBUG TOKEN (from queue):")
+            print(f"Token: {tok.type}")
+            print(f"Valor: {tok.value}")
+            print(f"Línea: {tok.lineno}")
+            
+            # Guardar este token
+            self.last_token = tok
+            self.last_tokens.append(tok)
+            self.lexer.last_token = tok
+            self.lexer.last_tokens.append(tok)
+            # Mantener solo los últimos 10 tokens
+            if len(self.last_tokens) > self.max_tokens_history:
+                self.last_tokens.pop(0)
+            if len(self.lexer.last_tokens) > self.max_tokens_history:
+                self.lexer.last_tokens.pop(0)
+            
+            return tok
+        
+        try:
+            tok = self.lexer.token()
+            if tok:
+                # Debug info
+                print(f"\nDEBUG TOKEN (from lexer):")
+                print(f"Token: {tok.type}")
+                print(f"Valor: {tok.value}")
+                print(f"Línea: {tok.lineno}")
+                
+                # Verificar si hay una coma suelta (coma seguida inmediatamente de paréntesis de cierre)
+                if tok.type == 'COMMA':
+                    # Mirar el siguiente token sin consumirlo
+                    next_pos = self.lexer.lexpos
+                    next_char = self.lexer.lexdata[next_pos:next_pos+1] if next_pos < len(self.lexer.lexdata) else ''
+                    # Si después de una coma viene un paréntesis de cierre
+                    if next_char == ')':
+                        lineno = tok.lineno
+                        self.errors.append(f"""Error sintáctico en línea {lineno}: Coma suelta en argumentos de función
+En el código:
+    {self.source_lines[lineno - 1]}
+    {' ' * self._find_column(tok)}^ No se permite una coma seguida de paréntesis de cierre
+Sugerencia: Elimina la coma o añade otro argumento después de la coma.""")
+                        self.valid_code = False
+                
+                # Guardar este token
+                self.last_token = tok
+                self.last_tokens.append(tok)
+                self.lexer.last_token = tok
+                self.lexer.last_tokens.append(tok)
+                # Mantener solo los últimos 10 tokens
+                if len(self.last_tokens) > self.max_tokens_history:
+                    self.last_tokens.pop(0)
+                if len(self.lexer.last_tokens) > self.max_tokens_history:
+                    self.lexer.last_tokens.pop(0)
+                
+                return tok
+            else:
+                # Si no hay más tokens, verificar delimitadores sin cerrar
+                self.check_unclosed_delimiters()
+                
+        except Exception as e:
+            # Si hay un error al procesar tokens, marcarlo como inválido
+            line_no = getattr(self.lexer, 'lineno', 0)
+            self.errors.append(f"Error léxico en línea {line_no}: {str(e)}")
+            self.valid_code = False
+            
+        return None
+
     def t_STRING(self, t):
         r'(?<!f)("([^"\n]|\\")*"|\'([^\'\n]|\\\')*\')'
         # Las comillas están bien cerradas
@@ -198,79 +297,6 @@ En el código:
         self.valid_code = False
         t.lexer.skip(1)
     
-    def token(self):
-        """Método requerido por PLY para obtener el siguiente token"""
-        if self.tokens_queue:
-            token_type, token_value, lineno = self.tokens_queue.pop(0)
-            tok = lex.LexToken()
-            tok.type = token_type
-            tok.value = token_value
-            tok.lineno = lineno
-            tok.lexpos = 0
-            
-            # Debug info
-            print(f"\nDEBUG TOKEN (from queue):")
-            print(f"Token: {tok.type}")
-            print(f"Valor: {tok.value}")
-            print(f"Línea: {tok.lineno}")
-            
-            # Guardar este token
-            self.last_token = tok
-            self.last_tokens.append(tok)
-            self.lexer.last_token = tok
-            self.lexer.last_tokens.append(tok)
-            # Mantener solo los últimos 10 tokens
-            if len(self.last_tokens) > self.max_tokens_history:
-                self.last_tokens.pop(0)
-            if len(self.lexer.last_tokens) > self.max_tokens_history:
-                self.lexer.last_tokens.pop(0)
-            
-            return tok
-        
-        try:
-            tok = self.lexer.token()
-            if tok:
-                # Debug info
-                print(f"\nDEBUG TOKEN (from lexer):")
-                print(f"Token: {tok.type}")
-                print(f"Valor: {tok.value}")
-                print(f"Línea: {tok.lineno}")
-                
-                # Verificar si hay una coma suelta (coma seguida inmediatamente de paréntesis de cierre)
-                if tok.type == 'COMMA':
-                    # Mirar el siguiente token sin consumirlo
-                    next_pos = self.lexer.lexpos
-                    next_char = self.lexer.lexdata[next_pos:next_pos+1] if next_pos < len(self.lexer.lexdata) else ''
-                    # Si después de una coma viene un paréntesis de cierre
-                    if next_char == ')':
-                        lineno = tok.lineno
-                        self.errors.append(f"""Error sintáctico en línea {lineno}: Coma suelta en argumentos de función
-En el código:
-    {self.source_lines[lineno - 1]}
-    {' ' * self._find_column(tok)}^ No se permite una coma seguida de paréntesis de cierre
-Sugerencia: Elimina la coma o añade otro argumento después de la coma.""")
-                        self.valid_code = False
-                
-                # Guardar este token
-                self.last_token = tok
-                self.last_tokens.append(tok)
-                self.lexer.last_token = tok
-                self.lexer.last_tokens.append(tok)
-                # Mantener solo los últimos 10 tokens
-                if len(self.last_tokens) > self.max_tokens_history:
-                    self.last_tokens.pop(0)
-                if len(self.lexer.last_tokens) > self.max_tokens_history:
-                    self.lexer.last_tokens.pop(0)
-                
-                return tok
-        except Exception as e:
-            # Si hay un error al procesar tokens, marcarlo como inválido
-            line_no = getattr(self.lexer, 'lineno', 0)
-            self.errors.append(f"Error léxico en línea {line_no}: {str(e)}")
-            self.valid_code = False
-            
-        return None
-
     def t_ARROW(self, t):
         r'->'
         return t
@@ -282,33 +308,38 @@ Sugerencia: Elimina la coma o añade otro argumento después de la coma.""")
 
     def t_LPAREN(self, t):
         r'\('
-        self.paren_stack.append((t.lexer.lineno, t.lexpos))
+        self.paren_stack.append((t.lexer.lineno, self._find_column(t)))
         return t
 
     def t_RPAREN(self, t):
         r'\)'
         if not self.paren_stack:
             line = self.source_lines[t.lexer.lineno - 1]
-            column = t.lexpos - sum(len(l) + 1 for l in self.source_lines[:t.lexer.lineno - 1])
-            self.errors.append(f"Error léxico en línea {t.lexer.lineno}: Paréntesis de cierre sin coincidencia")
+            column = self._find_column(t)
+            self.errors.append(f"""Error sintáctico en línea {t.lexer.lineno}: Paréntesis de cierre sin coincidencia
+En el código:
+    {line}
+    {' ' * column}^ No hay un paréntesis de apertura correspondiente""")
+            self.valid_code = False
         else:
             self.paren_stack.pop()
         return t
 
     def t_LBRACKET(self, t):
         r'\['
-        self.bracket_stack.append((t.lexer.lineno, t.lexpos))
+        self.bracket_stack.append((t.lexer.lineno, self._find_column(t)))
         return t
 
     def t_RBRACKET(self, t):
         r'\]'
         if not self.bracket_stack:
             line = self.source_lines[t.lexer.lineno - 1]
-            column = t.lexpos - sum(len(l) + 1 for l in self.source_lines[:t.lexer.lineno - 1])
+            column = self._find_column(t)
             self.errors.append(f"""Error sintáctico en línea {t.lexer.lineno}: Corchete de cierre sin coincidencia
 En el código:
     {line}
     {' ' * column}^ No hay un corchete de apertura correspondiente""")
+            self.valid_code = False
         else:
             self.bracket_stack.pop()
         return t
