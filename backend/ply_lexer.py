@@ -143,12 +143,6 @@ En el código:
             tok.lineno = lineno
             tok.lexpos = 0
             
-            # Debug info
-            print(f"\nDEBUG TOKEN (from queue):")
-            print(f"Token: {tok.type}")
-            print(f"Valor: {tok.value}")
-            print(f"Línea: {tok.lineno}")
-            
             # Guardar este token
             self.last_token = tok
             self.last_tokens.append(tok)
@@ -165,27 +159,6 @@ En el código:
         try:
             tok = self.lexer.token()
             if tok:
-                # Debug info
-                print(f"\nDEBUG TOKEN (from lexer):")
-                print(f"Token: {tok.type}")
-                print(f"Valor: {tok.value}")
-                print(f"Línea: {tok.lineno}")
-                
-                # Verificar si hay una coma suelta (coma seguida inmediatamente de paréntesis de cierre)
-                if tok.type == 'COMMA':
-                    # Mirar el siguiente token sin consumirlo
-                    next_pos = self.lexer.lexpos
-                    next_char = self.lexer.lexdata[next_pos:next_pos+1] if next_pos < len(self.lexer.lexdata) else ''
-                    # Si después de una coma viene un paréntesis de cierre
-                    if next_char == ')':
-                        lineno = tok.lineno
-                        self.errors.append(f"""Error sintáctico en línea {lineno}: Coma suelta en argumentos de función
-En el código:
-    {self.source_lines[lineno - 1]}
-    {' ' * self._find_column(tok)}^ No se permite una coma seguida de paréntesis de cierre
-Sugerencia: Elimina la coma o añade otro argumento después de la coma.""")
-                        self.valid_code = False
-                
                 # Guardar este token
                 self.last_token = tok
                 self.last_tokens.append(tok)
@@ -246,7 +219,6 @@ También verifica si hay una coma faltante después del string."""
         # Verificar si es una palabra clave
         if t.value in self.keywords:
             t.type = 'KEYWORD'
-            print(f"\nDEBUG KEYWORD: Found keyword '{t.value}'")  # Debug info
         return t
     
     def t_NUMBER(self, t):
@@ -389,9 +361,6 @@ En el código:
         
         pattern = r'f"[^"]*"|f\'[^\']*\''
         processed_text = re.sub(pattern, replace_fstring, text)
-        print(f"\nDEBUG Preprocessor:")
-        print(f"Texto original: {text}")
-        print(f"Texto procesado: {processed_text}")
         return processed_text
     
     def input(self, text):

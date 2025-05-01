@@ -322,12 +322,12 @@ Sugerencia: Asegúrate de que la sentencia 'return' esté dentro de la definici�
             # Verificar y procesar sentencias en los bloques
             for stmt in then_branch:
                 if hasattr(stmt, 'expression') and isinstance(stmt.expression, CallExpr):
-                    print(f"DEBUG: Procesando llamada a función en bloque 'then': {stmt.expression.callee.name}")
+                    pass
             
             if else_branch:
                 for stmt in else_branch:
                     if hasattr(stmt, 'expression') and isinstance(stmt.expression, CallExpr):
-                        print(f"DEBUG: Procesando llamada a función en bloque 'else': {stmt.expression.callee.name}")
+                        pass
             
             # Crear un WRAPPER para toda la sentencia
             # Este enfoque nos permite continuar incluso si hay errores en los bloques individuales
@@ -361,7 +361,7 @@ Sugerencia: Asegúrate de que la sentencia 'return' esté dentro de la definici�
             # Verificar y procesar sentencias en el cuerpo
             for stmt in body:
                 if hasattr(stmt, 'expression') and isinstance(stmt.expression, CallExpr):
-                    print(f"DEBUG: Procesando llamada a función en bucle 'for': {stmt.expression.callee.name}")
+                    pass
             
             p[0] = ForStmt(variable, iterable, body)
             
@@ -391,7 +391,7 @@ Sugerencia: Asegúrate de que la sentencia 'return' esté dentro de la definici�
             # Verificar y procesar sentencias en el cuerpo
             for stmt in body:
                 if hasattr(stmt, 'expression') and isinstance(stmt.expression, CallExpr):
-                    print(f"DEBUG: Procesando llamada a función en bucle 'while': {stmt.expression.callee.name}")
+                    pass
             
             p[0] = WhileStmt(condition, body)
             

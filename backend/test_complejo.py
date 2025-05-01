@@ -6,7 +6,7 @@ total = 0
 for numero in numeros:
     # Condicional if-else
     if numero % 2 == 0:
-        print("Número par:", numero)
+        print("Número par:", numero
     else:
         print("Número impar:", numero)
     total = total + numero

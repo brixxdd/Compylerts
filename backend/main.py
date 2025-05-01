@@ -14,7 +14,6 @@ def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
     """Compila código Python a TypeScript"""
     try:
         # Crear el lexer y parser
-        print("Inicializando lexer...")
         lexer = PLYLexer(source_code)
         
         # Procesar todos los tokens para detectar errores léxicos
@@ -29,7 +28,6 @@ def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
         if not lexer.valid_code or lexer.errors:
             return None, lexer.errors
         
-        print("Inicializando parser...")
         parser = PLYParser(source_code)
         
         # SOLUCIÓN: Pre-registrar todas las funciones definidas en el código
@@ -61,7 +59,6 @@ def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
         has_control_structures = False
         if re.search(r'\b(if|for|while)\b.*:', source_code) or 'else:' in source_code:
             has_control_structures = True
-            print("Código con estructuras de control detectado")
         
         # Verificar si hay definiciones de funciones
         has_functions = 'def ' in source_code
@@ -71,16 +68,13 @@ def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
         
         if has_control_structures:
             # Usar la conversión directa para estructuras de control
-            print("Usando conversión directa para estructuras de control")
             typescript_code = convert_control_structures(source_code)
             return typescript_code, []
         
         # Parsear el código
-        print("Parseando código...")
         # Crear un nuevo lexer para el parsing real
         new_lexer = PLYLexer(source_code)
         ast = parser.parse(source_code, new_lexer)
-        print(f"AST generado: {ast is not None}")
         
         # Verificar si hay errores semánticos
         if parser.semantic_errors:
@@ -95,20 +89,12 @@ def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
             else:
                 filtered_errors.append(error)
         
-        if ignored_errors > 0:
-            print(f"Se ignoraron {ignored_errors} errores relacionados con 'print' en bloques")
-        
         # Si hay errores que no ignoramos, retornarlos
         if filtered_errors:
             return None, filtered_errors
         
         if ast:
-            print("\n=== AST Generated ===")
-            print_ast(ast)
-            print("===================\n")
-            
             # Generación de código TypeScript
-            print("Generando código TypeScript...")
             generator = TypeScriptGenerator()
             typescript_code = generator.generate(ast)
             return typescript_code, []
@@ -127,8 +113,6 @@ def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
             return None, ["Error: No se pudo generar el AST"]
             
     except Exception as e:
-        print(f"Excepción inesperada: {str(e)}")
-        traceback.print_exc()
         return None, [f"❌ Error inesperado: {str(e)}"]
 
 def convert_control_structures(source_code: str) -> str:
