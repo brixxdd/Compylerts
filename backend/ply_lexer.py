@@ -3,6 +3,7 @@ from enum import Enum, auto
 from dataclasses import dataclass
 from typing import List, Optional
 import re
+from error_handler import error_handler, CompilerError, ErrorType
 
 # Definir nuestros propios tipos de token
 class TokenType(Enum):
@@ -83,23 +84,19 @@ class PLYLexer:
     # Ignorar espacios y tabs (excepto para indentación)
     t_ignore = ' \t'
     
-    def __init__(self, text):
-        # Configuración del lexer
+    def __init__(self, source_code: str):
+        self.source_code = source_code
+        self.source_lines = source_code.splitlines()
         self.lexer = lex.lex(module=self)
-        self.errors = []
-        self.source_lines = text.splitlines()
+        self.lexer.input(source_code)
         self.valid_code = True
-        self.lineno = 1  # Añadir contador de línea
-        
-        # Lista para mantener los últimos tokens
-        self.last_tokens = []
         self.last_token = None
-        self.lexer.last_tokens = []
-        self.lexer.last_token = None
+        self.last_tokens = []
+        self.max_tokens_history = 10
         
-        # Preprocesar el texto antes de pasarlo al lexer
-        processed_text = self.preprocess_fstrings(text)
-        self.lexer.input(processed_text)
+        # Inicializar el lexer
+        self.check_unclosed_delimiters()
+        self.check_invalid_characters()
         
         # Variables para manejar indentación
         self.indent_stack = [0]
@@ -109,79 +106,68 @@ class PLYLexer:
         self.index = 0
         self.previous_line = 1
         self.previous_column = 0
-        self.max_tokens_history = 10  # Número máximo de tokens a mantener
 
     def check_unclosed_delimiters(self):
-        """Verifica si hay delimitadores sin cerrar al final del análisis"""
-        # Verificar paréntesis sin cerrar
-        for line_no, pos in self.paren_stack:
-            line = self.source_lines[line_no - 1]
-            column = pos - sum(len(l) + 1 for l in self.source_lines[:line_no - 1])
-            self.errors.append(f"""Error sintáctico en línea {line_no}: Paréntesis de apertura sin cerrar
-En el código:
-    {line}
-    {' ' * column}^ Falta el paréntesis de cierre ')'""")
-            self.valid_code = False
+        """Verifica delimitadores sin cerrar"""
+        for i, line in enumerate(self.source_lines, 1):
+            # Verificar paréntesis
+            if '(' in line and ')' not in line[line.find('('):]:
+                col = line.find('(')
+                error_handler.add_error(CompilerError(
+                    type=ErrorType.SYNTACTIC,
+                    line=i,
+                    message="Paréntesis sin cerrar",
+                    code_line=line,
+                    column=col,
+                    suggestion="Agrega el paréntesis de cierre ')'"
+                ))
+                self.valid_code = False
+            
+            # Verificar corchetes
+            if '[' in line and ']' not in line[line.find('['):]:
+                col = line.find('[')
+                error_handler.add_error(CompilerError(
+                    type=ErrorType.SYNTACTIC,
+                    line=i,
+                    message="Corchete sin cerrar",
+                    code_line=line,
+                    column=col,
+                    suggestion="Agrega el corchete de cierre ']'"
+                ))
+                self.valid_code = False
 
-        # Verificar corchetes sin cerrar
-        for line_no, pos in self.bracket_stack:
-            line = self.source_lines[line_no - 1]
-            column = pos - sum(len(l) + 1 for l in self.source_lines[:line_no - 1])
-            self.errors.append(f"""Error sintáctico en línea {line_no}: Corchete de apertura sin cerrar
-En el código:
-    {line}
-    {' ' * column}^ Falta el corchete de cierre ']'""")
-            self.valid_code = False
+    def check_invalid_characters(self):
+        """Verifica caracteres inválidos en el código"""
+        invalid_chars = '@#$&~`'
+        for i, line in enumerate(self.source_lines, 1):
+            # Ignorar caracteres inválidos en comentarios
+            comment_pos = line.find('#')
+            check_line = line if comment_pos == -1 else line[:comment_pos]
+            
+            for char in invalid_chars:
+                if char == '#':  # Ignorar # ya que es para comentarios
+                    continue
+                if char in check_line:
+                    col = check_line.index(char)
+                    error_handler.add_error(CompilerError(
+                        type=ErrorType.LEXICAL,
+                        line=i,
+                        message=f"Carácter no válido '{char}'",
+                        code_line=line,
+                        column=col,
+                        suggestion=f"El carácter '{char}' no está permitido en el lenguaje"
+                    ))
+                    self.valid_code = False
 
     def token(self):
         """Método requerido por PLY para obtener el siguiente token"""
-        if self.tokens_queue:
-            token_type, token_value, lineno = self.tokens_queue.pop(0)
-            tok = lex.LexToken()
-            tok.type = token_type
-            tok.value = token_value
-            tok.lineno = lineno
-            tok.lexpos = 0
-            
-            # Guardar este token
+        tok = self.lexer.token()
+        if tok:
             self.last_token = tok
             self.last_tokens.append(tok)
-            self.lexer.last_token = tok
-            self.lexer.last_tokens.append(tok)
-            # Mantener solo los últimos 10 tokens
             if len(self.last_tokens) > self.max_tokens_history:
                 self.last_tokens.pop(0)
-            if len(self.lexer.last_tokens) > self.max_tokens_history:
-                self.lexer.last_tokens.pop(0)
-            
-            return tok
-        
-        try:
-            tok = self.lexer.token()
-            if tok:
-                # Guardar este token
-                self.last_token = tok
-                self.last_tokens.append(tok)
-                self.lexer.last_token = tok
-                self.lexer.last_tokens.append(tok)
-                # Mantener solo los últimos 10 tokens
-                if len(self.last_tokens) > self.max_tokens_history:
-                    self.last_tokens.pop(0)
-                if len(self.lexer.last_tokens) > self.max_tokens_history:
-                    self.lexer.last_tokens.pop(0)
-                
-                return tok
-            else:
-                # Si no hay más tokens, verificar delimitadores sin cerrar
-                self.check_unclosed_delimiters()
-                
-        except Exception as e:
-            # Si hay un error al procesar tokens, marcarlo como inválido
-            line_no = getattr(self.lexer, 'lineno', 0)
-            self.errors.append(f"Error léxico en línea {line_no}: {str(e)}")
-            self.valid_code = False
-            
-        return None
+        return tok
 
     def t_STRING(self, t):
         r'(?<!f)("([^"\n]|\\")*"|\'([^\'\n]|\\\')*\')'
@@ -202,7 +188,14 @@ Sugerencia: El string debe terminar con la misma comilla con la que inicia.
 Para corregir este error, añade {quote_type} al final del string:
     nombre = {quote_type}{content.strip()}{quote_type}
 También verifica si hay una coma faltante después del string."""
-        self.errors.append(error_msg)
+        error_handler.add_error(CompilerError(
+            type=ErrorType.LEXICAL,
+            line=t.lexer.lineno,
+            message=error_msg,
+            code_line=self.source_lines[t.lexer.lineno - 1],
+            column=self._find_column(t),
+            suggestion="Revisa los strings y asegúrate de que estén correctamente cerrados"
+        ))
         self.valid_code = False
         # Avanzar hasta el final de la línea
         while t.lexer.lexpos < len(t.lexer.lexdata) and t.lexer.lexdata[t.lexer.lexpos] != '\n':
@@ -211,14 +204,39 @@ También verifica si hay una coma faltante después del string."""
 
     def t_ID(self, t):
         r'[a-zA-Z_][a-zA-Z0-9_]*'
-        if not all(ord(c) < 128 for c in t.value):
-            self.errors.append(f"Error en línea {t.lexer.lineno}: El identificador '{t.value}' contiene caracteres no ASCII.")
-            self.valid_code = False
-            return None
-        
         # Verificar si es una palabra clave
         if t.value in self.keywords:
             t.type = 'KEYWORD'
+        else:
+            # Verificar si es un identificador no definido que parece una función
+            next_char = self.lexer.lexdata[t.lexpos + len(t.value):t.lexpos + len(t.value) + 1]
+            if next_char == '(':
+                # Lista de funciones conocidas
+                known_funcs = ['print', 'input', 'len', 'str', 'int', 'float', 'list', 'range']
+                
+                # Verificar si la función está definida
+                if t.value not in self.keywords and t.value not in known_funcs:
+                    # Verificar si puede ser un error tipográfico de una función conocida
+                    possible_typos = []
+                    for func in known_funcs:
+                        # Calcular la distancia de Levenshtein para determinar similitud
+                        if self._is_similar(t.value, func):
+                            possible_typos.append(func)
+                    
+                    # Sugerencia específica si parece un error tipográfico
+                    suggestion = f"Asegúrate de que la función '{t.value}' esté definida antes de usarla"
+                    if possible_typos:
+                        suggestion = f"¿Quisiste decir '{possible_typos[0]}'? Asegúrate de escribir correctamente el nombre de la función."
+                    
+                    error_handler.add_error(CompilerError(
+                        type=ErrorType.SEMANTIC,
+                        line=t.lineno,
+                        message=f"Función '{t.value}' no está definida",
+                        code_line=self.source_lines[t.lineno - 1],
+                        column=t.lexpos - sum(len(l) + 1 for l in self.source_lines[:t.lineno - 1]),
+                        suggestion=suggestion
+                    ))
+                    self.valid_code = False
         return t
     
     def t_NUMBER(self, t):
@@ -248,10 +266,14 @@ También verifica si hay una coma faltante después del string."""
                         self.tokens_queue.append(('DEDENT', 'DEDENT', self.lineno))
                     if indent != self.indent_stack[-1]:
                         expected_indent = self.indent_stack[-1]
-                        self.errors.append(
-                            f"Error en línea {self.lineno}: Indentación inconsistente. "
-                            f"Se esperaba un nivel de {expected_indent} espacios."
-                        )
+                        error_handler.add_error(CompilerError(
+                            type=ErrorType.SYNTACTIC,
+                            line=self.lineno,
+                            message=f"Indentación inconsistente. Se esperaba un nivel de {expected_indent} espacios.",
+                            code_line=self.source_lines[self.lineno - 1],
+                            column=self._find_column(t),
+                            suggestion=f"Revisa la indentación del código para que sea consistente"
+                        ))
         return t
     
     def t_COMMENT(self, t):
@@ -260,12 +282,20 @@ También verifica si hay una coma faltante después del string."""
         return None
     
     def t_error(self, t):
-        # Solo mostrar error de carácter no válido si no es parte de un string sin cerrar
-        if not (t.value.startswith('"') or t.value.startswith("'")):
-            self.errors.append(f"""Error léxico en línea {t.lexer.lineno}: Carácter no válido '{t.value[0]}'
-En el código:
-    {self.source_lines[t.lexer.lineno - 1]}
-    {' ' * self._find_column(t)}^ Aquí se encontró el carácter no válido""")
+        # Ignorar caracteres inválidos dentro de comentarios
+        line = self.source_lines[t.lineno - 1]
+        if '#' in line and t.lexpos > line.find('#'):
+            t.lexer.skip(1)
+            return
+
+        error_handler.add_error(CompilerError(
+            type=ErrorType.LEXICAL,
+            line=t.lineno,
+            message=f"Carácter no válido '{t.value[0]}'",
+            code_line=line,
+            column=t.lexpos - sum(len(l) + 1 for l in self.source_lines[:t.lineno - 1]),
+            suggestion="Revisa los caracteres permitidos en el lenguaje"
+        ))
         self.valid_code = False
         t.lexer.skip(1)
     
@@ -288,10 +318,14 @@ En el código:
         if not self.paren_stack:
             line = self.source_lines[t.lexer.lineno - 1]
             column = self._find_column(t)
-            self.errors.append(f"""Error sintáctico en línea {t.lexer.lineno}: Paréntesis de cierre sin coincidencia
-En el código:
-    {line}
-    {' ' * column}^ No hay un paréntesis de apertura correspondiente""")
+            error_handler.add_error(CompilerError(
+                type=ErrorType.SYNTACTIC,
+                line=t.lexer.lineno,
+                message="Paréntesis de cierre sin coincidencia",
+                code_line=line,
+                column=column,
+                suggestion="Agrega el paréntesis de apertura '(' correspondiente"
+            ))
             self.valid_code = False
         else:
             self.paren_stack.pop()
@@ -307,10 +341,14 @@ En el código:
         if not self.bracket_stack:
             line = self.source_lines[t.lexer.lineno - 1]
             column = self._find_column(t)
-            self.errors.append(f"""Error sintáctico en línea {t.lexer.lineno}: Corchete de cierre sin coincidencia
-En el código:
-    {line}
-    {' ' * column}^ No hay un corchete de apertura correspondiente""")
+            error_handler.add_error(CompilerError(
+                type=ErrorType.SYNTACTIC,
+                line=t.lexer.lineno,
+                message="Corchete de cierre sin coincidencia",
+                code_line=line,
+                column=column,
+                suggestion="Agrega el corchete de apertura '[' correspondiente"
+            ))
             self.valid_code = False
         else:
             self.bracket_stack.pop()
@@ -376,3 +414,29 @@ En el código:
         if last_cr < 0:
             last_cr = 0
         return token.lexpos - last_cr
+
+    def _is_similar(self, s1, s2):
+        """Determina si dos cadenas son similares (posible error tipográfico)"""
+        # Implementación simple: si tienen la misma longitud y difieren en 1-2 caracteres
+        if abs(len(s1) - len(s2)) > 1:
+            return False
+            
+        # Si una es subcadena de la otra
+        if s1 in s2 or s2 in s1:
+            return True
+            
+        # Contar diferencias
+        if len(s1) == len(s2):
+            differences = sum(1 for a, b in zip(s1, s2) if a != b)
+            return differences <= 2
+            
+        # Intentar alinear y contar diferencias
+        if len(s1) < len(s2):
+            s1, s2 = s2, s1  # s1 siempre es la más larga
+            
+        # Verificar si quitando/añadiendo un carácter son iguales
+        for i in range(len(s1)):
+            if s1[:i] + s1[i+1:] == s2:
+                return True
+                
+        return False

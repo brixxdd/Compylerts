@@ -6,6 +6,7 @@ from ast_nodes import print_ast
 from colorama import init, Fore, Style
 import traceback
 import re
+from error_handler import error_handler, CompilerError, ErrorType
 
 # Inicializar colorama para salida con color
 init()
@@ -24,15 +25,12 @@ def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
                 break
             tokens.append(token)
         
-        # Si hay errores en el lexer o el código no es válido, retornar los errores inmediatamente
-        if not lexer.valid_code or lexer.errors:
-            return None, lexer.errors
+        # Nota: No detenemos el proceso aquí, seguimos para detectar también errores semánticos
+        has_lexical_errors = error_handler.get_errors_by_type(ErrorType.LEXICAL)
         
         parser = PLYParser(source_code)
         
-        # SOLUCIÓN: Pre-registrar todas las funciones definidas en el código
-        # y usar una estrategia diferente - convertir directamente a TypeScript para casos simples
-        function_found = False
+        # Pre-registrar todas las funciones definidas en el código
         for i, line in enumerate(source_code.splitlines()):
             stripped_line = line.strip()
             if stripped_line.startswith('def '):
@@ -40,20 +38,9 @@ def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
                     func_name = stripped_line.split()[1].split('(')[0]
                     parser.user_defined_functions.add(func_name)
                     parser.known_functions.append(func_name)
-                    # Marcar que estamos en un contexto de función
                     parser.function_contexts.append(func_name)
-                    function_found = True
                 except:
                     pass
-        
-        # Si hay funciones definidas, usar la conversión simple en lugar del parser
-        if function_found:
-            typescript_code = convert_simple_function(source_code)
-            if typescript_code:
-                return typescript_code, []
-            else:
-                # Si devuelve None, es porque hubo un error en la conversión
-                return None, ["Error sintáctico: Hay problemas en la estructura del código. Revisa las llamadas a funciones por posibles comas sueltas."]
         
         # Verificar si es código con estructuras de control
         has_control_structures = False
@@ -63,35 +50,24 @@ def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
         # Verificar si hay definiciones de funciones
         has_functions = 'def ' in source_code
         if has_functions:
-            # Asignar nivel de indentación para funciones
             parser.indent_level = 4
         
-        if has_control_structures:
+        if has_control_structures and not has_lexical_errors:
             # Usar la conversión directa para estructuras de control
             typescript_code = convert_control_structures(source_code)
             return typescript_code, []
         
-        # Parsear el código
-        # Crear un nuevo lexer para el parsing real
+        # Parsear el código incluso si hay errores léxicos
         new_lexer = PLYLexer(source_code)
-        ast = parser.parse(source_code, new_lexer)
+        try:
+            ast = parser.parse(source_code, new_lexer)
+        except Exception as e:
+            # Si falla el parser, continuamos con los errores ya detectados
+            ast = None
         
-        # Verificar si hay errores semánticos
-        if parser.semantic_errors:
-            return None, parser.semantic_errors
-        
-        # Filtrar errores específicos relacionados con print en bloques
-        filtered_errors = []
-        ignored_errors = 0
-        for error in parser.errors:
-            if "Token inesperado 'print'" in error or "Token inesperado ':'" in error:
-                ignored_errors += 1
-            else:
-                filtered_errors.append(error)
-        
-        # Si hay errores que no ignoramos, retornarlos
-        if filtered_errors:
-            return None, filtered_errors
+        # Ahora sí, si hay errores, retornarlos
+        if error_handler.has_errors():
+            return None, [error_handler.format_errors()]
         
         if ast:
             # Generación de código TypeScript
@@ -100,20 +76,25 @@ def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
             return typescript_code, []
         else:
             # Convertir directamente a TypeScript sin AST
-            # Este método es una solución provisional para casos simples
             if has_control_structures:
-                # Ya intentamos con la conversión directa anteriormente
                 pass
             else:
-                # Intenta un enfoque más simple para expresiones básicas
                 typescript_code = convert_simple_expressions(source_code)
                 if typescript_code:
                     return typescript_code, []
             
-            return None, ["Error: No se pudo generar el AST"]
+            return None, [error_handler.format_errors()]
             
     except Exception as e:
-        return None, [f"❌ Error inesperado: {str(e)}"]
+        error_handler.add_error(CompilerError(
+            type=ErrorType.SEMANTIC,
+            line=1,
+            message=f"Error inesperado: {str(e)}",
+            code_line=source_code.splitlines()[0] if source_code else "",
+            column=0,
+            suggestion="Contacta al desarrollador para reportar este error"
+        ))
+        return None, [error_handler.format_errors()]
 
 def convert_control_structures(source_code: str) -> str:
     """Convierte estructuras de control de Python a TypeScript usando reemplazos directos por patrones"""

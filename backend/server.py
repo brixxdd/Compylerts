@@ -5,6 +5,7 @@ from ply_lexer import PLYLexer
 from ply_parser import PLYParser
 from typescript_generator import TypeScriptGenerator
 from main import compile_to_typescript
+from error_handler import error_handler, ErrorType
 import re
 import sys
 import io
@@ -31,10 +32,31 @@ async def compile_code(request: CompileRequest):
         if not code.endswith('\n'):
             code = code + '\n'
 
+        # Resetear errores previos
+        error_handler.errors = []
+
         # Capturar la salida de la compilación
         old_stdout = sys.stdout
         redirected_output = io.StringIO()
         sys.stdout = redirected_output
+
+        # Realizar una primera pasada para detectar errores léxicos
+        lexer = PLYLexer(code)
+        tokens = []
+        while True:
+            token = lexer.token()
+            if not token:
+                break
+            tokens.append(token)
+        
+        # Realizar una segunda pasada para detectar errores semánticos
+        # incluso si hay errores léxicos
+        parser = PLYParser(code)
+        try:
+            ast = parser.parse(code, PLYLexer(code))
+        except Exception as e:
+            # Si falla el parser, continuamos con los errores ya detectados
+            pass
 
         # Ejecutar el compilador como lo haría main.py
         typescript_code, errors = compile_to_typescript(code)
@@ -49,15 +71,53 @@ async def compile_code(request: CompileRequest):
         # Filtrar líneas de DEBUG si es necesario
         filtered_output = [line for line in output_lines if not line.startswith("DEBUG")]
 
+        # Obtener errores formateados directamente del error_handler
+        formatted_errors = []
+        if error_handler.has_errors():
+            formatted_errors = [error_handler.format_errors()]
+
+        # Determinar la fase del error basada en los tipos de errores presentes
+        phase = "success"
+        if error_handler.has_errors():
+            if error_handler.get_errors_by_type(ErrorType.LEXICAL):
+                phase = "lexical"
+            elif error_handler.get_errors_by_type(ErrorType.SYNTACTIC):
+                phase = "syntactic"
+            elif error_handler.get_errors_by_type(ErrorType.SEMANTIC):
+                phase = "semantic"
+            else:
+                phase = "error"
+        
+        # Errores por tipo para el frontend
+        grouped_errors = {
+            "lexical": [error for error in error_handler.errors if error.type == ErrorType.LEXICAL],
+            "syntactic": [error for error in error_handler.errors if error.type == ErrorType.SYNTACTIC],
+            "semantic": [error for error in error_handler.errors if error.type == ErrorType.SEMANTIC]
+        }
+
+        # Convertir errores a formato JSON
+        serialized_errors = {
+            error_type: [
+                {
+                    "line": err.line,
+                    "message": err.message,
+                    "code_line": err.code_line,
+                    "column": err.column,
+                    "suggestion": err.suggestion
+                } for err in errors_list
+            ]
+            for error_type, errors_list in grouped_errors.items() if errors_list
+        }
+
         response = {
-            "success": not errors,
+            "success": not error_handler.has_errors(),
             "output": filtered_output,
-            "errors": errors or [],
+            "errors": formatted_errors or errors or [],
+            "grouped_errors": serialized_errors,
             "tokens": [],
-            "phase": "lexical" if errors and any("léxico" in e for e in errors) else 
-                    "syntactic" if errors and any("sintáctico" in e for e in errors) else
-                    "semantic" if errors else "success",
-            "typescript_code": typescript_code or ""
+            "phase": phase,
+            "typescript_code": typescript_code or "",
+            "raw_error_output": filtered_output if error_handler.has_errors() else []
         }
 
         # Procesar tokens
@@ -70,7 +130,8 @@ async def compile_code(request: CompileRequest):
             token_info = {
                 "type": tok.type,
                 "value": str(tok.value),
-                "line": tok.lineno
+                "line": tok.lineno,
+                "column": tok.lexpos
             }
             tokens.append(token_info)
         

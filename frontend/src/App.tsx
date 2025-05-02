@@ -15,6 +15,20 @@ interface InferredTypes {
   [key: string]: string;
 }
 
+interface CompilerDetailedError {
+  line: number;
+  message: string;
+  code_line: string;
+  column: number;
+  suggestion?: string;
+}
+
+interface GroupedErrors {
+  lexical?: CompilerDetailedError[];
+  syntactic?: CompilerDetailedError[];
+  semantic?: CompilerDetailedError[];
+}
+
 export interface CompileResponse {
   success: boolean
   tokens: Token[]
@@ -24,6 +38,8 @@ export interface CompileResponse {
   phase: 'lexical' | 'syntactic' | 'semantic' | 'error'
   typescript_code?: string
   inferred_types?: InferredTypes
+  raw_error_output?: string[]
+  grouped_errors?: GroupedErrors
   analysis?: {
     lexical: { success: boolean, errors: string[], tokens?: Token[] }
     syntactic: { success: boolean, errors: string[] }
@@ -101,6 +117,9 @@ numeros = [1, 2, 3, 4, 5]
         const lines = code.split('\n')
         const errors: string[] = []
         
+        // Agrupamos los errores por tipo para el mismo formato que el backend
+        const lexicalErrors: CompilerDetailedError[] = []
+        
         lines.forEach((line, lineIndex) => {
           const invalidCharPositions = [...line.matchAll(invalidCharsRegex)]
           invalidCharPositions.forEach(match => {
@@ -108,7 +127,17 @@ numeros = [1, 2, 3, 4, 5]
               errors.push(`Error léxico en línea ${lineIndex + 1}: Carácter no válido '${match[0]}'
 En el código:
     ${line}
-    ${' '.repeat(match.index)}^ Aquí se encontró el carácter no válido`)
+    ${' '.repeat(match.index)}^ Aquí
+Sugerencia: El carácter '${match[0]}' no está permitido en el lenguaje`)
+              
+              // Agregar a los errores agrupados
+              lexicalErrors.push({
+                line: lineIndex + 1,
+                message: `Carácter no válido '${match[0]}'`,
+                code_line: line,
+                column: match.index,
+                suggestion: `El carácter '${match[0]}' no está permitido en el lenguaje`
+              })
             }
           })
         })
@@ -128,18 +157,19 @@ En el código:
             },
             syntactic: { success: false, errors: [] },
             semantic: { success: false, errors: [] }
+          },
+          grouped_errors: {
+            lexical: lexicalErrors
           }
         })
-        setLoading(false)
-        return
+      } else {
+        const response = await axios.post<CompileResponse>(
+          'http://localhost:8000/compile',
+          { code }
+        )
+        
+        setResult(response.data)
       }
-
-      const response = await axios.post<CompileResponse>(
-        'http://localhost:8000/compile',
-        { code }
-      )
-      
-      setResult(response.data)
     } catch (error) {
       console.error('Error al compilar:', error)
       setResult({

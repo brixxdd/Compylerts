@@ -7,6 +7,7 @@ from ast_nodes import (
 )
 import re
 from symbol_table import SymbolTable, Symbol, Scope
+from error_handler import error_handler, CompilerError, ErrorType
 
 class PLYParser:
     """Parser sintáctico basado en PLY para el compilador Python -> TypeScript"""
@@ -23,19 +24,19 @@ class PLYParser:
         ('right', 'UMINUS'),  # Para el operador unario -
     )
     
-    def __init__(self, source_code=None):
+    def __init__(self, source_code: str):
         """Inicializa el parser"""
-        self.parser = yacc.yacc(module=self, debug=False)
-        self.errors = []
-        self.source_lines = source_code.splitlines() if source_code else []
-        self.user_defined_functions = set()
-        self.known_functions = ['print', 'input', 'len']
+        self.source_code = source_code
+        self.source_lines = source_code.splitlines()
         self.valid_code = True
+        self.user_defined_functions = set()
+        self.known_functions = ['print', 'input', 'len', 'str', 'int', 'float', 'list', 'range']
+        self.function_contexts = []
+        self.indent_level = 0
+        self.parser = yacc.yacc(module=self)
         self.symbol_table = SymbolTable()
         self.semantic_errors = []
         self.current_scope = None
-        self.indent_level = 0  # Añadido para rastrear el nivel de indentación actual
-        self.function_contexts = []  # Pila para rastrear contextos de función
     
     # ======================================================================
     # REGLAS BNF PARA EL LENGUAJE
@@ -123,34 +124,24 @@ class PLYParser:
             # Es una llamada a función directa (ID LPAREN args RPAREN)
             func_name = p[1]
             args = [] if p[3] == ')' else p[3]
+            
+            # Verificar si la función existe
+            if func_name not in self.user_defined_functions and func_name not in self.known_functions:
+                error_handler.add_error(CompilerError(
+                    type=ErrorType.SEMANTIC,
+                    line=p.lineno(1),
+                    message=f"Función '{func_name}' no está definida",
+                    code_line=self.source_lines[p.lineno(1) - 1],
+                    column=self.find_column(p),
+                    suggestion=f"Asegúrate de que la función '{func_name}' esté definida antes de usarla"
+                ))
+                self.valid_code = False
+            
             expr = CallExpr(Identifier(func_name), args)
-            
-            # Verificar argumentos
-            for arg in args:
-                if isinstance(arg, Identifier):
-                    symbol = self.symbol_table.resolve(arg.name)
-                    if not symbol and arg.name not in ['True', 'False', 'None']:
-                        self.semantic_errors.append(
-                            f"Error semántico en línea {p.lexer.lineno}: "
-                            f"Variable '{arg.name}' no está definida"
-                        )
-            
             p[0] = ExpressionStmt(expr)
         else:
             # Es una expresión normal
             expr = p[1]
-            # Verificar referencias a variables
-            if isinstance(expr, CallExpr):
-                # Verificar los argumentos de la llamada a función
-                for arg in expr.arguments:
-                    if isinstance(arg, Identifier):
-                        symbol = self.symbol_table.resolve(arg.name)
-                        if not symbol and arg.name not in ['True', 'False', 'None']:
-                            self.semantic_errors.append(
-                                f"Error semántico en línea {p.lexer.lineno}: "
-                                f"Variable '{arg.name}' no está definida"
-                            )
-            
             p[0] = ExpressionStmt(expr)
     
     # <assignment_statement> ::= ID ASSIGN <expression> NEWLINE
@@ -197,12 +188,15 @@ class PLYParser:
             if not is_in_function:
                 lineno = p.lineno(1) if hasattr(p, 'lineno') else 0
                 line = self.source_lines[lineno - 1] if lineno <= len(self.source_lines) else ""
-                column = self._find_column(p)
-                self.errors.append(f"""Error semántico en línea {lineno}: La sentencia 'return' debe estar dentro de una función
-En el código:
-    {line}
-    {' ' * column}^ No se puede usar 'return' fuera de una función
-Sugerencia: Asegúrate de que la sentencia 'return' esté dentro de la definición de una función.""")
+                column = self.find_column(p)
+                error_handler.add_error(CompilerError(
+                    type=ErrorType.SEMANTIC,
+                    line=lineno,
+                    message="La sentencia 'return' debe estar dentro de una función",
+                    code_line=line,
+                    column=column,
+                    suggestion="Asegúrate de que la sentencia 'return' esté dentro de la definición de una función."
+                ))
                 p[0] = None
                 return
             
@@ -315,7 +309,7 @@ Sugerencia: Asegúrate de que la sentencia 'return' esté dentro de la definici�
                 if p[8] == 'else':
                     else_branch = p[12] if p[12] else []
                 else:
-                    self.errors.append(f"Error de sintaxis en línea {p.lineno(8)}: se esperaba 'else', se encontró '{p[8]}'")
+                    self.semantic_errors.append(f"Error de sintaxis en línea {p.lineno(8)}: se esperaba 'else', se encontró '{p[8]}'")
                     p[0] = None
                     return
             
@@ -334,16 +328,16 @@ Sugerencia: Asegúrate de que la sentencia 'return' esté dentro de la definici�
             p[0] = IfStmt(condition, then_branch, else_branch)
             # Omitir errores específicos relacionados con print dentro de bloques
             error_indices = []
-            for i, error in enumerate(self.errors):
+            for i, error in enumerate(self.semantic_errors):
                 if "Token inesperado 'print'" in error:
                     error_indices.append(i)
             
             # Eliminar errores desde el final para no afectar los índices
             for i in sorted(error_indices, reverse=True):
-                if i < len(self.errors):
-                    self.errors.pop(i)
+                if i < len(self.semantic_errors):
+                    self.semantic_errors.pop(i)
         else:
-            self.errors.append(f"Error de sintaxis en línea {p.lineno(1)}: se esperaba 'if', se encontró '{p[1]}'")
+            self.semantic_errors.append(f"Error de sintaxis en línea {p.lineno(1)}: se esperaba 'if', se encontró '{p[1]}'")
             p[0] = None
     
     # <for_statement> ::= KEYWORD ID KEYWORD expression COLON NEWLINE INDENT <statement_list> DEDENT
@@ -367,18 +361,18 @@ Sugerencia: Asegúrate de que la sentencia 'return' esté dentro de la definici�
             
             # Omitir errores específicos relacionados con print dentro de bloques
             error_indices = []
-            for i, error in enumerate(self.errors):
+            for i, error in enumerate(self.semantic_errors):
                 if "Token inesperado 'print'" in error:
                     error_indices.append(i)
             
             # Eliminar errores desde el final para no afectar los índices
             for i in sorted(error_indices, reverse=True):
-                if i < len(self.errors):
-                    self.errors.pop(i)
+                if i < len(self.semantic_errors):
+                    self.semantic_errors.pop(i)
         else:
             error_token = p[3] if p[1] == 'for' else p[1]
             expected = 'in' if p[1] == 'for' else 'for'
-            self.errors.append(f"Error de sintaxis en línea {p.lineno(1)}: se esperaba '{expected}', se encontró '{error_token}'")
+            self.semantic_errors.append(f"Error de sintaxis en línea {p.lineno(1)}: se esperaba '{expected}', se encontró '{error_token}'")
             p[0] = None
 
     # <while_statement> ::= KEYWORD expression COLON NEWLINE INDENT statement_list DEDENT
@@ -397,16 +391,16 @@ Sugerencia: Asegúrate de que la sentencia 'return' esté dentro de la definici�
             
             # Omitir errores específicos relacionados con print dentro de bloques
             error_indices = []
-            for i, error in enumerate(self.errors):
+            for i, error in enumerate(self.semantic_errors):
                 if "Token inesperado 'print'" in error:
                     error_indices.append(i)
             
             # Eliminar errores desde el final para no afectar los índices
             for i in sorted(error_indices, reverse=True):
-                if i < len(self.errors):
-                    self.errors.pop(i)
+                if i < len(self.semantic_errors):
+                    self.semantic_errors.pop(i)
         else:
-            self.errors.append(f"Error de sintaxis en línea {p.lineno(1)}: se esperaba 'while', se encontró '{p[1]}'")
+            self.semantic_errors.append(f"Error de sintaxis en línea {p.lineno(1)}: se esperaba 'while', se encontró '{p[1]}'")
             p[0] = None
 
     
@@ -480,7 +474,18 @@ Sugerencia: Asegúrate de que la sentencia 'return' esté dentro de la definici�
                              | call
                              | group
                              | list_literal'''
-        if isinstance(p[1], str):  # ID
+        if len(p) == 2 and isinstance(p[1], str):  # ID
+            # Verificar si el identificador está definido
+            if p[1] not in self.user_defined_functions and p[1] not in self.known_functions and p[1] not in ['True', 'False', 'None']:
+                error_handler.add_error(CompilerError(
+                    type=ErrorType.SEMANTIC,
+                    line=p.lineno(1),
+                    message=f"Identificador '{p[1]}' no está definido",
+                    code_line=self.source_lines[p.lineno(1) - 1],
+                    column=self.find_column(p),
+                    suggestion=f"Asegúrate de definir '{p[1]}' antes de usarlo"
+                ))
+                self.valid_code = False
             p[0] = Identifier(p[1])
         else:
             p[0] = p[1]
@@ -511,8 +516,6 @@ Sugerencia: Asegúrate de que la sentencia 'return' esté dentro de la definici�
     def p_call(self, p):
         '''call : ID LPAREN arguments RPAREN
                 | ID LPAREN RPAREN'''
-        print(f"\nDEBUG CALL:")
-        print(f"Función llamada: {p[1]}")
         func_name = p[1]
         args = [] if len(p) == 4 else p[3]
         
@@ -521,34 +524,31 @@ Sugerencia: Asegúrate de que la sentencia 'return' esté dentro de la definici�
             p[0] = CallExpr(Identifier(func_name), args)
             return
         
-        # Verificar si la función existe y el número de argumentos
-        symbol = self.symbol_table.resolve(func_name)
-        if not symbol:
-            self.semantic_errors.append(
-                f"Error semántico en línea {p.lexer.lineno}: "
-                f"Función '{func_name}' no está definida"
-            )
-            p[0] = CallExpr(Identifier(func_name), args)
-            return
+        # Verificar si la función existe
+        if func_name not in self.user_defined_functions and func_name not in self.known_functions:
+            error_handler.add_error(CompilerError(
+                type=ErrorType.SEMANTIC,
+                line=p.lineno(1),
+                message=f"Función '{func_name}' no está definida",
+                code_line=self.source_lines[p.lineno(1) - 1],
+                column=self.find_column(p),
+                suggestion=f"Asegúrate de que la función '{func_name}' esté definida antes de usarla"
+            ))
+            self.valid_code = False
         
-        if symbol.kind != 'function':
-            self.semantic_errors.append(
-                f"Error semántico en línea {p.lexer.lineno}: "
-                f"'{func_name}' no es una función"
-            )
-            p[0] = CallExpr(Identifier(func_name), args)
-            return
-        
-        # No verificar número de argumentos para print
-        if func_name != 'print':
-            expected_args = len(symbol.parameters) if symbol.parameters else 0
-            received_args = len(args)
-            if expected_args != received_args:
-                self.semantic_errors.append(
-                    f"Error semántico en línea {p.lexer.lineno}: "
-                    f"La función '{func_name}' espera {expected_args} argumentos "
-                    f"pero recibió {received_args}"
-                )
+        # Verificar argumentos
+        for arg in args:
+            if isinstance(arg, Identifier):
+                if arg.name not in self.variables and arg.name not in ['True', 'False', 'None']:
+                    error_handler.add_error(CompilerError(
+                        type=ErrorType.SEMANTIC,
+                        line=p.lineno(1),
+                        message=f"Variable '{arg.name}' no está definida",
+                        code_line=self.source_lines[p.lineno(1) - 1],
+                        column=self.find_column(p),
+                        suggestion=f"Asegúrate de definir la variable '{arg.name}' antes de usarla"
+                    ))
+                    self.valid_code = False
         
         p[0] = CallExpr(Identifier(func_name), args)
     
@@ -619,112 +619,64 @@ Sugerencia: Asegúrate de que la sentencia 'return' esté dentro de la definici�
 
     # Manejo de errores
     def p_error(self, p):
-        """Error de sintaxis - proporciona mensajes de error más informativos"""
         if p is None:
-            # EOF inesperado
-            self.errors.append(f"Error de sintaxis: Fin inesperado del archivo")
-            return
-            
-        # Obtener la línea y columna
-        lineno = p.lineno if hasattr(p, 'lineno') else 0
-        lexpos = p.lexpos if hasattr(p, 'lexpos') else 0
-        
-        # Obtener el contenido de la línea
-        line = self.source_lines[lineno - 1] if lineno <= len(self.source_lines) else ""
-        column = self._find_column(p)
-        
-        # Token actual y anterior
-        current_token = p.type if hasattr(p, 'type') else "?"
-        current_value = p.value if hasattr(p, 'value') else "?"
-        
-        # Detección de comas faltantes
-        if current_token == 'STRING' and hasattr(p.lexer, 'last_tokens') and len(p.lexer.last_tokens) > 0:
-            prev_token = p.lexer.last_tokens[-1]
-            if prev_token.type == 'STRING':
-                self.errors.append(f"""Error de sintaxis en línea {lineno}: Falta una coma entre strings
-En el código:
-    {line}
-    {' ' * column}^ Falta una coma entre cadenas de texto
-Sugerencia: Añade una coma entre los elementos:
-    ["{prev_token.value}", "{current_value}"]""")
-                return
-                
-        # Contexto específico para mensajes de error más informativos
-        if current_token == 'COLON' and hasattr(p.lexer, 'last_tokens') and len(p.lexer.last_tokens) > 0:
-            prev_token = p.lexer.last_tokens[-1]
-            if prev_token.type == 'KEYWORD' and prev_token.value in ['if', 'else', 'for', 'while', 'def']:
-                # Proveer un mensaje más específico para este caso común
-                self.errors.append(f"""Error de sintaxis en línea {lineno}: Se esperaba una expresión después de '{prev_token.value}'
-En el código:
-    {line}
-    {' ' * column}^ Falta una expresión aquí""")
-                return
-        
-        # Detectar error de indentación
-        if current_token == 'DEDENT' or current_token == 'INDENT':
-            self.errors.append(f"""Error de indentación en línea {lineno}
-En el código:
-    {line}
-    {' ' * column}^ Indentación incorrecta
-Sugerencia: Usa 4 espacios para cada nivel de indentación""")
-            return
-        
-        # Detectar problemas con estructuras de control
-        if current_token == 'KEYWORD' and current_value in ['if', 'else', 'for', 'while']:
-            if self._is_function_def_context(p):
-                self.errors.append(f"""Error de sintaxis en línea {lineno}: Token inesperado '{current_value}'
-En el código:
-    {line}
-    {' ' * column}^ No se puede definir '{current_value}' aquí
-Sugerencia: Asegúrate de que las estructuras de control estén correctamente formateadas
-Por ejemplo: '{current_value} condición:' para if/while o 'for variable in iterable:' para bucles for""")
-            else:
-                self.errors.append(f"""Error de sintaxis en línea {lineno}: Token inesperado '{current_value}'
-En el código:
-    {line}
-    {' ' * column}^ Aquí
-Sugerencia: Revisa la sintaxis de las estructuras de control. 
-Para 'if': if condición: 
-Para 'for': for variable in iterable:
-Para 'while': while condición:""")
-            return
-        
-        # Mensaje genérico para otros casos
-        self.errors.append(f"""Error de sintaxis en línea {lineno}: Token inesperado '{current_value}'
-En el código:
-    {line}
-    {' ' * column}^ Aquí""")
-        
-        # Marcar que el código no es válido
+            # Error al final del archivo
+            error_handler.add_error(CompilerError(
+                type=ErrorType.SYNTACTIC,
+                line=len(self.source_lines),
+                message="Error de sintaxis al final del archivo",
+                code_line=self.source_lines[-1] if self.source_lines else "",
+                column=len(self.source_lines[-1]) if self.source_lines else 0,
+                suggestion="Verifica que no falte código o que esté correctamente terminado"
+            ))
+        else:
+            line = self.source_lines[p.lineno - 1]
+            error_handler.add_error(CompilerError(
+                type=ErrorType.SYNTACTIC,
+                line=p.lineno,
+                message=f"Error de sintaxis cerca de '{p.value}'",
+                code_line=line,
+                column=self.find_column(p),
+                suggestion="Revisa la sintaxis del código en esta línea"
+            ))
         self.valid_code = False
 
-    def _find_column(self, token):
-        """Encuentra la columna donde está un token"""
-        if token is None or not hasattr(token, 'lexpos'):
-            return 0
-        if not hasattr(token.lexer, 'lexdata'):
-            return len(self.source_lines[token.lineno - 1]) if self.source_lines else 0
-        input = token.lexer.lexdata
-        last_cr = input.rfind('\n', 0, token.lexpos)
+    def check_undefined_function(self, func_name: str, lineno: int):
+        """Verifica si una función está definida"""
+        if func_name not in self.user_defined_functions and func_name not in self.known_functions:
+            line = self.source_lines[lineno - 1]
+            error_handler.add_error(CompilerError(
+                type=ErrorType.SEMANTIC,
+                line=lineno,
+                message=f"Función '{func_name}' no está definida",
+                code_line=line,
+                column=line.find(func_name),
+                suggestion=f"Asegúrate de que la función '{func_name}' esté definida antes de usarla"
+            ))
+            self.valid_code = False
+
+    def check_undefined_variable(self, var_name: str, lineno: int):
+        """Verifica si una variable está definida"""
+        if var_name not in self.variables:
+            line = self.source_lines[lineno - 1]
+            error_handler.add_error(CompilerError(
+                type=ErrorType.SEMANTIC,
+                line=lineno,
+                message=f"Variable '{var_name}' no está definida",
+                code_line=line,
+                column=line.find(var_name),
+                suggestion=f"Asegúrate de definir la variable '{var_name}' antes de usarla"
+            ))
+            self.valid_code = False
+
+    def find_column(self, token):
+        """Encuentra la columna de un token en la línea"""
+        last_cr = self.source_code.rfind('\n', 0, token.lexpos)
         if last_cr < 0:
             last_cr = 0
-        return token.lexpos - last_cr
+        column = (token.lexpos - last_cr)
+        return column
 
-    def _is_function_def_context(self, token):
-        """Verifica si estamos en el contexto de una definición de función"""
-        if not hasattr(token.lexer, 'last_tokens'):
-            return False
-        
-        # Buscar los últimos tokens para ver si estamos después de una definición de función
-        last_tokens = getattr(token.lexer, 'last_tokens', [])
-        expected_sequence = ['KEYWORD', 'ID', 'LPAREN', 'RPAREN', 'ARROW', 'ID']
-        
-        if len(last_tokens) >= len(expected_sequence):
-            recent_tokens = [t.type for t in last_tokens[-len(expected_sequence):]]
-            return recent_tokens == expected_sequence and last_tokens[-6].value == 'def'
-        return False
-
-    # Modificar el método que verifica llamadas a funciones para evitar duplicados
     def _check_function_call(self, call_expr, line):
         """Verifica una llamada a función"""
         func_name = call_expr.callee.name
@@ -766,7 +718,6 @@ En el código:
     def parse(self, text, lexer=None):
         """Analiza el texto y construye el AST"""
         self.source_lines = text.splitlines()
-        self.errors = []
         self.semantic_errors = []
         
         # No reiniciar la tabla de símbolos completamente para preservar las funciones pre-registradas
@@ -781,7 +732,7 @@ En el código:
             
             # Si el lexer tiene errores, no continuar con el parsing
             if lexer and (not lexer.valid_code or lexer.errors):
-                self.errors.extend(lexer.errors)
+                self.semantic_errors.extend(lexer.errors)
                 return None
                 
             # Si no se proporciona un lexer, crear uno nuevo
@@ -791,7 +742,7 @@ En el código:
                 while lexer.token():
                     pass
                 if not lexer.valid_code or lexer.errors:
-                    self.errors.extend(lexer.errors)
+                    self.semantic_errors.extend(lexer.errors)
                     return None
                 # Reiniciar el lexer para el parsing
                 lexer = PLYLexer(text)
@@ -800,17 +751,17 @@ En el código:
             ast = self.parser.parse(input=text, lexer=lexer.lexer)
             
             # Comprobar si hay errores de sintaxis
-            if self.errors:
+            if self.semantic_errors:
                 return None
                 
             # Comprobar si hay errores semánticos
             if self.semantic_errors:
-                self.errors.extend(self.semantic_errors)
+                self.semantic_errors.extend(self.semantic_errors)
                 return None
             
             return ast
         except Exception as e:
-            self.errors.append(f"Error inesperado: {str(e)}")
+            self.semantic_errors.append(f"Error inesperado: {str(e)}")
             return None
 
     def _is_in_function_context(self):

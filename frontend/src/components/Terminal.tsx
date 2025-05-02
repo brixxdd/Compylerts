@@ -18,9 +18,17 @@ function Terminal({ code, result, loading }: TerminalProps) {
     }
 
     return output.map((line, index) => {
-      // Colorear errores
-      if (line.includes('Error') && (line.includes('léxico') || line.includes('sintáctico') || line.includes('semántico'))) {
-        return <div key={index} className="terminal-line error-text">{line}</div>;
+      // Colorear errores léxicos
+      if (line.toLowerCase().includes('error léxico')) {
+        return <div key={index} className="terminal-line error-text lexical-error">{line}</div>;
+      }
+      // Colorear errores sintácticos
+      else if (line.toLowerCase().includes('error sintáctico')) {
+        return <div key={index} className="terminal-line error-text syntactic-error">{line}</div>;
+      }
+      // Colorear errores semánticos
+      else if (line.toLowerCase().includes('error semántico')) {
+        return <div key={index} className="terminal-line error-text semantic-error">{line}</div>;
       }
       // Colorear mensajes de éxito
       else if (line.includes('✅')) {
@@ -83,6 +91,37 @@ function Terminal({ code, result, loading }: TerminalProps) {
     }, 100);
   };
 
+  // Función para aplicar formato HTML a los errores
+  const formatErrorText = (errorText: string): string => {
+    if (!errorText) return '';
+    
+    // Reemplazar secciones específicas con spans coloreados
+    return errorText
+      // Encabezados de categoría
+      .replace(/LEXICAL:/g, '<span class="lexical">LEXICAL:</span>')
+      .replace(/SEMANTIC:/g, '<span class="semantic">SEMANTIC:</span>')
+      .replace(/SYNTACTIC:/g, '<span class="syntactic">SYNTACTIC:</span>')
+      
+      // Líneas de error
+      .replace(/(Error léxico en línea \d+:.+)$/gm, '<span class="error-message">$1</span>')
+      .replace(/(Error sintáctico en línea \d+:.+)$/gm, '<span class="error-message">$1</span>')
+      .replace(/(Error semántico en línea \d+:.+)$/gm, '<span class="error-message">$1</span>')
+      .replace(/(Línea \d+: .+)$/gm, '<span class="error-message">$1</span>')
+      .replace(/(Función '.+' no está definida)$/gm, '<span class="error-message">$1</span>')
+      
+      // Contexto de código
+      .replace(/(En el código:)$/gm, '<span class="code-context">$1</span>')
+      
+      // Marcadores de error
+      .replace(/(.*\^.*)$/gm, '<span class="error-marker">$1</span>')
+      
+      // Sugerencias
+      .replace(/(Sugerencia:.+)$/gm, '<span class="suggestion">$1</span>')
+      
+      // Consejos
+      .replace(/(Consejo:.+)$/gm, '<span class="consejo">$1</span>');
+  };
+
   return (
     <div className="terminal-window">
       <div className="terminal-header">
@@ -136,18 +175,96 @@ function Terminal({ code, result, loading }: TerminalProps) {
               {/* Mostrar errores si los hay */}
               {result.errors.length > 0 && (
                 <>
-                  {/* Encabezado unificado para errores */}
+                  {/* Mostrar los errores tal como vienen del servidor */}
                   <div className="terminal-line error-text">
                     ❌ Errores encontrados:
                   </div>
                   
-                  {result.errors.map((error, idx) => (
-                    <div key={`err-${idx}`} className="error-message">
-                      {error.split('\n').map((line, i) => (
-                        <div key={i}>{line}</div>
-                      ))}
+                  {/* Mostrar errores procesados por tipo */}
+                  <div className="error-container">
+                    {/* Mostrar siempre todos los grupos de errores */}
+                    {result.grouped_errors?.lexical && result.grouped_errors.lexical.length > 0 && (
+                      <div className="error-category">
+                        <div className="error-category-header lexical">LEXICAL:</div>
+                        <div className="error-content">
+                          {result.grouped_errors.lexical.map((error, idx) => (
+                            <div key={`lexical-${idx}`} className="detailed-error">
+                              <div className="error-message">Error léxico en línea {error.line}: {error.message}</div>
+                              <div className="error-code-context">En el código:</div>
+                              <pre className="error-code-line">{error.code_line}</pre>
+                              <pre className="error-marker">{' '.repeat(error.column)}^ Aquí</pre>
+                              {error.suggestion && (
+                                <div className="error-suggestion">Sugerencia: {error.suggestion}</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Errores sintácticos */}
+                    {result.grouped_errors?.syntactic && result.grouped_errors.syntactic.length > 0 && (
+                      <div className="error-category">
+                        <div className="error-category-header syntactic">SYNTACTIC:</div>
+                        <div className="error-content">
+                          {result.grouped_errors.syntactic.map((error, idx) => (
+                            <div key={`syntactic-${idx}`} className="detailed-error">
+                              <div className="error-message">Error sintáctico en línea {error.line}: {error.message}</div>
+                              <div className="error-code-context">En el código:</div>
+                              <pre className="error-code-line">{error.code_line}</pre>
+                              <pre className="error-marker">{' '.repeat(error.column)}^ Aquí</pre>
+                              {error.suggestion && (
+                                <div className="error-suggestion">Sugerencia: {error.suggestion}</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Errores semánticos */}
+                    {result.grouped_errors?.semantic && result.grouped_errors.semantic.length > 0 && (
+                      <div className="error-category">
+                        <div className="error-category-header semantic">SEMANTIC:</div>
+                        <div className="error-content">
+                          {result.grouped_errors.semantic.map((error, idx) => (
+                            <div key={`semantic-${idx}`} className="detailed-error">
+                              <div className="error-message">Error semántico en línea {error.line}: {error.message}</div>
+                              <div className="error-code-context">En el código:</div>
+                              <pre className="error-code-line">{error.code_line}</pre>
+                              <pre className="error-marker">{' '.repeat(error.column)}^ Aquí</pre>
+                              {error.suggestion && (
+                                <div className="error-suggestion">Sugerencia: {error.suggestion}</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Si no hay errores agrupados, mostrar el formato antiguo */}
+                    {!result.grouped_errors && (
+                      <div className="error-category">
+                        <div className="error-content">
+                          <pre className="error-message">{result.errors[0]}</pre>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Si hay salida completa para depuración */}
+                  {result.raw_error_output && result.raw_error_output.length > 0 && (
+                    <div className="debug-section">
+                      <details>
+                        <summary>Detalle completo</summary>
+                        <pre className="debug-output">
+                          {result.raw_error_output.map((line, idx) => (
+                            <div key={idx}>{line}</div>
+                          ))}
+                        </pre>
+                      </details>
                     </div>
-                  ))}
+                  )}
                 </>
               )}
 

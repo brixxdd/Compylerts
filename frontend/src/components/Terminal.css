@@ -1,119 +1,181 @@
 .terminal-window {
   background-color: #1e1e1e;
-  border-radius: 8px;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  margin: 20px;
   overflow: hidden;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   display: flex;
   flex-direction: column;
-  margin-bottom: 20px;
   height: 100%;
-  max-height: 700px;
 }
 
 .terminal-header {
-  background-color: #333333;
-  padding: 8px 12px;
+  background-color: #323233;
+  padding: 8px 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-top-left-radius: 8px;
-  border-top-right-radius: 8px;
+  border-bottom: 1px solid #424242;
 }
 
 .terminal-title {
-  font-size: 14px;
   color: #cccccc;
-  font-family: monospace;
+  font-size: 14px;
 }
 
 .terminal-buttons {
   display: flex;
+  gap: 8px;
 }
 
 .terminal-button {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  margin-left: 8px;
+  display: inline-block;
 }
 
-.terminal-button.minimize {
-  background-color: #f1c40f;
-}
-
-.terminal-button.maximize {
-  background-color: #2ecc71;
-}
-
-.terminal-button.close {
-  background-color: #e74c3c;
-}
+.minimize { background-color: #ffbd2e; }
+.maximize { background-color: #28c940; }
+.close { background-color: #ff5f56; }
 
 .terminal-content {
-  padding: 12px;
-  font-family: 'Courier New', monospace;
-  color: #f0f0f0;
+  flex: 1;
+  padding: 16px;
   overflow-y: auto;
-  flex-grow: 1;
-  max-height: calc(100vh - 250px);
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #cccccc;
+  max-height: none;
+  height: auto;
 }
 
 .terminal-line {
+  margin: 4px 0;
   white-space: pre-wrap;
-  line-height: 1.5;
-  margin-bottom: 2px;
 }
 
 .error-text {
-  color: #e74c3c;
+  color: #ff5f56;
 }
 
-.terminal-code {
-  background-color: #2d2d2d;
-  padding: 10px;
-  border-radius: 4px;
+.success-line {
+  color: #28c940;
+}
+
+/* Estilos para los errores */
+.error-container {
   margin: 10px 0;
-  overflow-x: auto;
-  white-space: pre;
 }
 
-.prompt {
-  color: #3498db;
+.error-category {
+  margin-bottom: 15px;
+  background-color: #1e1e1e;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.error-category-header {
+  padding: 8px 12px;
+  font-weight: bold;
+  background-color: #2a2a2a;
+  color: #ff5f56;
+}
+
+.error-category-header.lexical {
+  color: #ff5f56;
+}
+
+.error-category-header.syntactic {
+  color: #ffbd2e;
+}
+
+.error-category-header.semantic {
+  color: #28c940;
+}
+
+.error-content {
+  padding: 10px;
+}
+
+.error-message {
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  margin: 5px 0;
+  padding: 0;
+  background: transparent;
+  color: #cccccc;
+}
+
+/* Estilos para la sección de debugging */
+.debug-section {
+  margin-top: 20px;
+}
+
+.debug-section summary {
+  cursor: pointer;
+  color: #ffbd2e;
+  padding: 8px 12px;
+  background-color: #2a2a2a;
+  border-radius: 4px;
   font-weight: bold;
 }
 
-.output-line {
-  font-family: 'Courier New', monospace;
-  color: #aaaaaa;
-  padding: 5px 0;
+.debug-section summary:hover {
+  background-color: #333333;
 }
 
-/* Nuevos estilos para pestañas y sección de TypeScript */
+.debug-output {
+  margin-top: 10px;
+  padding: 10px;
+  background-color: #1e1e1e;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: #aaaaaa;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* Estilos para el código */
+.terminal-code {
+  background-color: #2a2a2a;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin: 8px 0;
+  white-space: pre-wrap;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+/* Estilos para las pestañas */
 .terminal-tabs {
   display: flex;
-  background-color: #2d2d2d;
-  border-bottom: 1px solid #444444;
+  background-color: #252526;
+  border-bottom: 1px solid #424242;
 }
 
 .terminal-tab {
   padding: 8px 16px;
+  color: #cccccc;
   background: none;
   border: none;
-  color: #aaaaaa;
-  font-size: 14px;
   cursor: pointer;
-  transition: background-color 0.2s, color 0.2s;
+  font-size: 14px;
+  transition: background-color 0.2s;
 }
 
 .terminal-tab:hover {
-  background-color: #3d3d3d;
-  color: #f0f0f0;
+  background-color: #2a2a2a;
 }
 
 .terminal-tab.active {
   background-color: #1e1e1e;
-  color: #ffffff;
-  border-bottom: 2px solid #3498db;
+  border-bottom: 2px solid #007acc;
 }
 
 /* Estilos para la sección de TypeScript */
@@ -125,97 +187,16 @@
   overflow-x: auto;
   white-space: pre;
   color: #e6e1dc;
-  font-family: 'Courier New', monospace;
+  font-family: 'Consolas', 'Monaco', monospace;
   line-height: 1.6;
   font-size: 14px;
-  max-height: 350px;
-  overflow-y: auto;
 }
 
-.typescript-code .keyword {
-  color: #569cd6;
-}
-
-.typescript-code .string {
-  color: #ce9178;
-}
-
-.typescript-code .number {
-  color: #b5cea8;
-}
-
-.typescript-code .comment {
-  color: #6a9955;
-}
-
-.inferred-types-section {
-  margin: 15px 0;
-  background-color: #2a2a2a;
-  padding: 10px;
-  border-radius: 4px;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.types-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 10px;
-  font-family: 'Courier New', monospace;
-}
-
-.types-table th {
-  text-align: left;
-  padding: 8px;
-  border-bottom: 1px solid #444444;
-  color: #3498db;
-}
-
-.types-table td {
-  padding: 8px;
-  border-bottom: 1px solid #3d3d3d;
-}
-
-.types-table td:first-child {
-  color: #f39c12;
-  font-weight: bold;
-}
-
-.types-table td:last-child {
-  color: #2ecc71;
-}
-
-/* Resaltado de tipos específicos */
-.types-table td:last-child:contains("number[]") {
-  color: #e74c3c;
-}
-
-.types-table td:last-child:contains("string[]") {
-  color: #9b59b6;
-}
-
-.types-table td:last-child:contains("boolean[]") {
-  color: #f1c40f;
-}
-
-/* Estilos para destacar líneas de error/éxito */
-.error-line {
-  background-color: rgba(231, 76, 60, 0.2);
-  font-weight: bold;
-}
-
-.success-line {
-  color: #2ecc71;
-  font-weight: bold;
-}
-
-/* Mejora para la visualización de errores */
-.error-message {
-  background-color: #2d2d2d;
-  border-left: 3px solid #e74c3c;
-  padding: 8px 12px;
-  margin: 8px 0;
-  border-radius: 0 4px 4px 0;
+.ts-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 15px;
 }
 
 /* Estilos para el botón de descarga */
@@ -235,47 +216,157 @@
   cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 8px;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .download-button:hover {
   background-color: #2980b9;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
-}
-
-.download-button:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .download-icon {
-  margin-right: 8px;
   font-size: 16px;
 }
 
-/* Estructura de 2 columnas para la sección de TypeScript con más espacio */
-.ts-container {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  margin-top: 15px;
+.terminal-errors {
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  background-color: #1e1e1e;
+  color: #cccccc;
+  padding: 10px;
+  margin: 10px 0;
+  border-radius: 4px;
+  overflow-x: auto;
+  max-height: none;
+  height: auto;
 }
 
-/* En pantallas más grandes, mostrar en 2 columnas */
-@media (min-width: 1200px) {
-  .ts-container {
-    flex-direction: row;
-  }
-  
-  .ts-code-section {
-    flex: 3;
-  }
-  
-  .ts-info-section {
-    flex: 1;
-    max-width: 300px;
-  }
+.terminal-errors:not(:empty) {
+  border-left: 3px solid #ff5f56;
+}
+
+/* Colorear las secciones de errores */
+.terminal-errors .lexical {
+  color: #ff5f56;
+  font-weight: bold;
+}
+
+.terminal-errors .semantic {
+  color: #ffbd2e;
+  font-weight: bold;
+}
+
+.terminal-errors .syntactic {
+  color: #28c940;
+  font-weight: bold;
+}
+
+.terminal-errors .error-message {
+  color: #ff5f56;
+}
+
+.terminal-errors .code-context {
+  color: #cccccc;
+  margin-left: 2px;
+}
+
+.terminal-errors .error-marker {
+  color: #ff5f56;
+  white-space: pre;
+}
+
+.terminal-errors .suggestion {
+  color: #28c940;
+  font-style: italic;
+}
+
+.terminal-errors .consejo {
+  color: #ffbd2e;
+  font-style: italic;
+  margin-top: 10px;
+  display: block;
+}
+
+.raw-errors {
+  color: #ff5f56;
+}
+
+.raw-error-section {
+  margin-top: 20px;
+  padding: 10px;
+  background-color: #2a2a2a;
+  border-radius: 4px;
+}
+
+.raw-error-section h4 {
+  color: #ffbd2e;
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.terminal-raw-errors {
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  background-color: #1e1e1e;
+  color: #cccccc;
+  padding: 10px;
+  margin: 0;
+  border-radius: 4px;
+  overflow-x: auto;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.raw-error-line {
+  white-space: pre-wrap;
+  margin: 2px 0;
+}
+
+/* Estilos para los errores detallados */
+.detailed-error {
+  margin-bottom: 15px;
+  padding-left: 15px;
+  border-left: 2px solid #555;
+}
+
+.detailed-error:last-child {
+  margin-bottom: 0;
+}
+
+.error-message {
+  color: #ff5f56;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.error-code-context {
+  color: #cccccc;
+  margin-bottom: 5px;
+}
+
+.error-code-line {
+  color: #cccccc;
+  background-color: #2a2a2a;
+  padding: 5px;
+  margin: 5px 0;
+  border-radius: 3px;
+  white-space: pre;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.error-marker {
+  color: #ff5f56;
+  margin: 0 0 5px 0;
+  padding: 0 5px;
+  white-space: pre;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.error-suggestion {
+  color: #28c940;
+  font-style: italic;
+  margin-top: 5px;
 }
