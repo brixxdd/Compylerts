@@ -34,13 +34,20 @@ def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
         parser = PLYParser(source_code)
         
         # Pre-registrar todas las funciones definidas en el código
-        for i, line in enumerate(source_code.splitlines()):
+        # Este paso es esencial para evitar falsos errores de "función no definida"
+        function_defs = {}
+        for i, line in enumerate(source_code.splitlines(), 1):
             stripped_line = line.strip()
             if stripped_line.startswith('def '):
                 try:
+                    # Extraer el nombre de la función
                     func_name = stripped_line.split()[1].split('(')[0]
+                    # Registrar la función y su línea
+                    function_defs[func_name] = i
+                    # Añadir a las listas del parser
                     parser.user_defined_functions.add(func_name)
-                    parser.known_functions.append(func_name)
+                    if func_name not in parser.known_functions:
+                        parser.known_functions.append(func_name)
                     parser.function_contexts.append(func_name)
                 except:
                     pass
@@ -67,6 +74,27 @@ def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
         except Exception as e:
             # Si falla el parser, continuamos con los errores ya detectados
             ast = None
+        
+        # Filtrar errores de funciones no definidas si ya están definidas
+        if function_defs:
+            filtered_errors = []
+            for error in error_handler.errors:
+                # Si es un error de función no definida, verificar si realmente está definida
+                if (error.type == ErrorType.SEMANTIC and 
+                    "función" in error.message.lower() and 
+                    "no está definida" in error.message.lower()):
+                    # Extraer el nombre de la función del mensaje de error
+                    func_match = re.search(r"'([^']+)'", error.message)
+                    if func_match:
+                        func_name = func_match.group(1)
+                        # Si la función está definida en alguna parte del código,
+                        # y la llamada ocurre después de la definición, ignorar el error
+                        if func_name in function_defs and error.line >= function_defs[func_name]:
+                            continue
+                filtered_errors.append(error)
+            
+            # Actualizar la lista de errores
+            error_handler.errors = filtered_errors
         
         # Ahora sí, si hay errores, retornarlos
         if error_handler.has_errors():

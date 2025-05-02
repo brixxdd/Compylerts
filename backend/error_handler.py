@@ -30,17 +30,12 @@ class CompilerError:
 class ErrorHandler:
     def __init__(self):
         self.errors: List[CompilerError] = []
+        self.function_advice_added = False
         
     def add_error(self, error: CompilerError):
-        # Verificar si este error ya existe (mismo tipo, línea, mensaje, columna)
-        for existing_error in self.errors:
-            if (existing_error.type == error.type and
-                existing_error.line == error.line and
-                existing_error.message == error.message and
-                existing_error.column == error.column):
-                # Error duplicado, no agregarlo
-                return
-        # Si no es duplicado, agregarlo
+        # Evitar agregar errores duplicados
+        if error in self.errors:
+            return
         self.errors.append(error)
     
     def has_errors(self) -> bool:
@@ -52,25 +47,26 @@ class ErrorHandler:
     def clear_errors(self):
         """Limpia todos los errores acumulados"""
         self.errors = []
+        self.function_advice_added = False
     
     def format_errors(self) -> str:
         if not self.errors:
             return ""
         
-        # Ordenar errores primero por tipo y luego por línea
-        self.errors.sort(key=lambda x: (x.type.value, x.line))
-        
-        # Eliminamos cualquier duplicado que haya pasado
-        unique_errors = []
+        # Asegurarnos de que no hay duplicados
+        unique_errors = set()
         for error in self.errors:
-            if error not in unique_errors:
-                unique_errors.append(error)
+            unique_errors.add(error)
+        
+        # Convertir a lista y ordenar
+        unique_errors_list = list(unique_errors)
+        unique_errors_list.sort(key=lambda x: (x.type.value, x.line))
         
         output = ["❌ Errores encontrados:"]
         
         # Procesar errores por tipo
         for error_type in ErrorType:
-            type_errors = [e for e in unique_errors if e.type == error_type]
+            type_errors = [e for e in unique_errors_list if e.type == error_type]
             if type_errors:
                 output.append(f"\n{error_type.name}:")
                 for error in type_errors:
@@ -81,9 +77,10 @@ class ErrorHandler:
                     if error.suggestion:
                         output.append(f"  Sugerencia: {error.suggestion}")
         
-        # Agregar consejos para errores comunes
-        if any(e.type == ErrorType.SEMANTIC and "función" in e.message.lower() for e in unique_errors):
+        # Agregar consejos para errores comunes (solo una vez)
+        if any(e.type == ErrorType.SEMANTIC and "función" in e.message.lower() for e in unique_errors_list):
             output.append("\nConsejo: Asegúrate de que todas las funciones que usas estén definidas antes de llamarlas.")
+            self.function_advice_added = True
         
         return "\n".join(output)
 
