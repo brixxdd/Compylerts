@@ -370,3 +370,14 @@
   font-style: italic;
   margin-top: 5px;
 }
+
+/* Estilos para mensajes de consejo */
+.error-advice {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: #2a2a2a;
+  border-radius: 4px;
+  color: #ffbd2e;
+  font-style: italic;
+  border-left: 3px solid #ffbd2e;
+}

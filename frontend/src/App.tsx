@@ -110,66 +110,14 @@ numeros = [1, 2, 3, 4, 5]
         return
       }
 
-      // Validación de caracteres especiales
-      const invalidCharsRegex = /[@$¿¡]/g
-      const invalidChars = code.match(invalidCharsRegex)
-      if (invalidChars) {
-        const lines = code.split('\n')
-        const errors: string[] = []
-        
-        // Agrupamos los errores por tipo para el mismo formato que el backend
-        const lexicalErrors: CompilerDetailedError[] = []
-        
-        lines.forEach((line, lineIndex) => {
-          const invalidCharPositions = [...line.matchAll(invalidCharsRegex)]
-          invalidCharPositions.forEach(match => {
-            if (match.index !== undefined) {
-              errors.push(`Error léxico en línea ${lineIndex + 1}: Carácter no válido '${match[0]}'
-En el código:
-    ${line}
-    ${' '.repeat(match.index)}^ Aquí
-Sugerencia: El carácter '${match[0]}' no está permitido en el lenguaje`)
-              
-              // Agregar a los errores agrupados
-              lexicalErrors.push({
-                line: lineIndex + 1,
-                message: `Carácter no válido '${match[0]}'`,
-                code_line: line,
-                column: match.index,
-                suggestion: `El carácter '${match[0]}' no está permitido en el lenguaje`
-              })
-            }
-          })
-        })
-
-        setResult({
-          success: false,
-          tokens: [],
-          errors: errors,
-          ast: null,
-          output: [],
-          phase: 'lexical',
-          analysis: {
-            lexical: { 
-              success: false, 
-              tokens: [],
-              errors: errors
-            },
-            syntactic: { success: false, errors: [] },
-            semantic: { success: false, errors: [] }
-          },
-          grouped_errors: {
-            lexical: lexicalErrors
-          }
-        })
-      } else {
-        const response = await axios.post<CompileResponse>(
-          'http://localhost:8000/compile',
-          { code }
-        )
-        
-        setResult(response.data)
-      }
+      // Enviar el código al servidor sin prevalidación
+      // para detectar todos los errores en una sola pasada
+      const response = await axios.post<CompileResponse>(
+        'http://localhost:8000/compile',
+        { code }
+      )
+      
+      setResult(response.data)
     } catch (error) {
       console.error('Error al compilar:', error)
       setResult({

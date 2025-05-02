@@ -182,7 +182,7 @@ function Terminal({ code, result, loading }: TerminalProps) {
                   
                   {/* Mostrar errores procesados por tipo */}
                   <div className="error-container">
-                    {/* Mostrar siempre todos los grupos de errores */}
+                    {/* Mostrar siempre todos los grupos de errores, en orden: léxicos, sintácticos, semánticos */}
                     {result.grouped_errors?.lexical && result.grouped_errors.lexical.length > 0 && (
                       <div className="error-category">
                         <div className="error-category-header lexical">LEXICAL:</div>
@@ -202,7 +202,6 @@ function Terminal({ code, result, loading }: TerminalProps) {
                       </div>
                     )}
                     
-                    {/* Errores sintácticos */}
                     {result.grouped_errors?.syntactic && result.grouped_errors.syntactic.length > 0 && (
                       <div className="error-category">
                         <div className="error-category-header syntactic">SYNTACTIC:</div>
@@ -222,7 +221,6 @@ function Terminal({ code, result, loading }: TerminalProps) {
                       </div>
                     )}
                     
-                    {/* Errores semánticos */}
                     {result.grouped_errors?.semantic && result.grouped_errors.semantic.length > 0 && (
                       <div className="error-category">
                         <div className="error-category-header semantic">SEMANTIC:</div>
@@ -242,12 +240,12 @@ function Terminal({ code, result, loading }: TerminalProps) {
                       </div>
                     )}
                     
-                    {/* Si no hay errores agrupados, mostrar el formato antiguo */}
-                    {!result.grouped_errors && (
-                      <div className="error-category">
-                        <div className="error-content">
-                          <pre className="error-message">{result.errors[0]}</pre>
-                        </div>
+                    {/* Mostrar consejos específicos basados en tipos de errores */}
+                    {result.grouped_errors?.semantic && result.grouped_errors.semantic.some(e => 
+                      e.message && e.message.includes("función") && e.message.includes("no está definida")
+                    ) && (
+                      <div className="error-advice">
+                        Consejo: Asegúrate de que todas las funciones que usas estén definidas antes de llamarlas.
                       </div>
                     )}
                   </div>

@@ -40,7 +40,7 @@ async def compile_code(request: CompileRequest):
         redirected_output = io.StringIO()
         sys.stdout = redirected_output
 
-        # Realizar una primera pasada para detectar errores léxicos
+        # PRIMERA FASE: Detección de errores léxicos
         lexer = PLYLexer(code)
         tokens = []
         while True:
@@ -49,17 +49,41 @@ async def compile_code(request: CompileRequest):
                 break
             tokens.append(token)
         
-        # Realizar una segunda pasada para detectar errores semánticos
-        # incluso si hay errores léxicos
+        # SEGUNDA FASE: Detección de errores semánticos y sintácticos
+        # incluso si ya hay errores léxicos
         parser = PLYParser(code)
         try:
+            # Pre-registrar todas las funciones definidas en el código
+            for i, line in enumerate(code.splitlines()):
+                stripped_line = line.strip()
+                if stripped_line.startswith('def '):
+                    try:
+                        func_name = stripped_line.split()[1].split('(')[0]
+                        parser.user_defined_functions.add(func_name)
+                        parser.known_functions.append(func_name)
+                        parser.function_contexts.append(func_name)
+                    except:
+                        pass
+            
+            # Intentar parsear el código incluso con errores léxicos
             ast = parser.parse(code, PLYLexer(code))
         except Exception as e:
             # Si falla el parser, continuamos con los errores ya detectados
-            pass
-
-        # Ejecutar el compilador como lo haría main.py
-        typescript_code, errors = compile_to_typescript(code)
+            print(f"DEBUG: Exception during parsing: {str(e)}")
+        
+        # TERCERA FASE (opcional): Intentar compilar a TypeScript
+        # Solo lo hacemos si no hay errores léxicos graves
+        has_lexical_errors = any(err.type == ErrorType.LEXICAL for err in error_handler.errors)
+        if not has_lexical_errors:
+            try:
+                typescript_code, errors = compile_to_typescript(code)
+            except Exception as e:
+                typescript_code = None
+                errors = [str(e)]
+                print(f"DEBUG: Exception during TypeScript compilation: {str(e)}")
+        else:
+            typescript_code = None
+            errors = []
         
         # Restaurar stdout
         sys.stdout = old_stdout
@@ -79,11 +103,15 @@ async def compile_code(request: CompileRequest):
         # Determinar la fase del error basada en los tipos de errores presentes
         phase = "success"
         if error_handler.has_errors():
-            if error_handler.get_errors_by_type(ErrorType.LEXICAL):
+            lexical_errors = error_handler.get_errors_by_type(ErrorType.LEXICAL)
+            syntactic_errors = error_handler.get_errors_by_type(ErrorType.SYNTACTIC)
+            semantic_errors = error_handler.get_errors_by_type(ErrorType.SEMANTIC)
+            
+            if lexical_errors:
                 phase = "lexical"
-            elif error_handler.get_errors_by_type(ErrorType.SYNTACTIC):
+            elif syntactic_errors:
                 phase = "syntactic"
-            elif error_handler.get_errors_by_type(ErrorType.SEMANTIC):
+            elif semantic_errors:
                 phase = "semantic"
             else:
                 phase = "error"
