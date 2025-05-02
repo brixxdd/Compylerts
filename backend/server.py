@@ -33,7 +33,7 @@ async def compile_code(request: CompileRequest):
             code = code + '\n'
 
         # Resetear errores previos
-        error_handler.errors = []
+        error_handler.clear_errors()
 
         # Capturar la salida de la compilación
         old_stdout = sys.stdout

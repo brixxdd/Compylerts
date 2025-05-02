@@ -14,6 +14,9 @@ init()
 def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
     """Compila código Python a TypeScript"""
     try:
+        # Limpiar errores previos
+        error_handler.clear_errors()
+        
         # Crear el lexer y parser
         lexer = PLYLexer(source_code)
         
