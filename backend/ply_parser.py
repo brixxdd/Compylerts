@@ -253,6 +253,43 @@ class PLYParser:
             self.indent_level = 4
             
             p[0] = FunctionDef(name, params, return_type, body)
+            
+    # Error: Falta ":" después del tipo de retorno en la definición de función
+    def p_function_def_missing_colon(self, p):
+        '''function_def : KEYWORD ID LPAREN parameter_list RPAREN return_type NEWLINE INDENT statement_list DEDENT'''
+        if p[1] == 'def':
+            line = p.lineno(1) if hasattr(p, 'lineno') else 0
+            if line > 0 and line <= len(self.source_lines):
+                code_line = self.source_lines[line - 1]
+                # Buscar dónde debería ir el ":"
+                if '->' in code_line:
+                    # El ":" debería ir después del tipo de retorno
+                    colon_pos = code_line.rfind('>') + 1
+                else:
+                    # El ":" debería ir después del paréntesis de cierre
+                    colon_pos = code_line.rfind(')')
+                    if colon_pos == -1:
+                        colon_pos = len(code_line)
+                    else:
+                        colon_pos += 1
+                
+                error_handler.add_error(CompilerError(
+                    type=ErrorType.SYNTACTIC,
+                    line=line,
+                    message="Falta el carácter ':' en la definición de función",
+                    code_line=code_line,
+                    column=colon_pos,
+                    suggestion="Añade ':' después del tipo de retorno o paréntesis de cierre"
+                ))
+                self.valid_code = False
+            
+            # Intentar recuperarse del error
+            name = p[2]
+            params = p[4] if p[4] else []
+            return_type = p[6].name if p[6] else 'void'
+            body = p[9] if p[9] else []
+            
+            p[0] = FunctionDef(name, params, return_type, body)
     
     # <parameter_list> ::= <parameter> | <parameter_list> COMMA <parameter>
     def p_parameter_list(self, p):
@@ -870,6 +907,35 @@ class PLYParser:
             error_msg = f"Error semántico en línea {line}: Variable '{var_name}' no está definida"
             if error_msg not in self.semantic_errors:
                 self.semantic_errors.append(error_msg)
+
+    # Error: Indentación incorrecta en el cuerpo de la función
+    def p_function_def_missing_indent(self, p):
+        '''function_def : KEYWORD ID LPAREN parameter_list RPAREN return_type COLON NEWLINE statement_list'''
+        if p[1] == 'def':
+            # Detectamos una función sin indentación correcta
+            line = p.lineno(8) + 1 if hasattr(p, 'lineno') else 0  # Línea después del NEWLINE
+            if line > 0 and line <= len(self.source_lines):
+                code_line = self.source_lines[line - 1]
+                
+                error_handler.add_error(CompilerError(
+                    type=ErrorType.SYNTACTIC,
+                    line=line,
+                    message="Indentación incorrecta en el cuerpo de la función",
+                    code_line=code_line,
+                    column=0,  # Al principio de la línea
+                    suggestion="El cuerpo de la función debe estar indentado (usualmente con 4 espacios o un tabulador)"
+                ))
+                self.valid_code = False
+            
+            # Intentar recuperarse del error
+            name = p[2]
+            params = p[4] if p[4] else []
+            return_type = 'void'
+            if p[6]:
+                return_type = p[6].name
+            body = p[9] if p[9] else []
+            
+            p[0] = FunctionDef(name, params, return_type, body)
 
 def print_ast(node, indent=0):
     """Imprime el AST de forma legible"""

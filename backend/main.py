@@ -79,6 +79,64 @@ def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
                             suggestion="Elimina la coma o añade otro argumento después de la coma"
                         ))
         
+        # Verificar funciones definidas sin dos puntos después del tipo de retorno
+        for i, line in enumerate(source_code.splitlines(), 1):
+            stripped_line = line.strip()
+            # Verificar si es una definición de función
+            if stripped_line.startswith('def ') and '(' in stripped_line and ')' in stripped_line:
+                # Verificar si termina correctamente con ":"
+                if not stripped_line.endswith(':'):
+                    # Verificar si tiene tipo de retorno
+                    if '->' in stripped_line:
+                        # Debería tener ":" después del tipo de retorno
+                        colon_pos = stripped_line.rfind('>') + 1
+                    else:
+                        # Debería tener ":" después del paréntesis de cierre
+                        colon_pos = stripped_line.rfind(')') + 1
+                    
+                    error_handler.add_error(CompilerError(
+                        type=ErrorType.SYNTACTIC,
+                        line=i,
+                        message="Falta el carácter ':' en la definición de función",
+                        code_line=line,
+                        column=len(line.rstrip()),  # Al final de la línea
+                        suggestion="Añade ':' después del tipo de retorno o paréntesis de cierre"
+                    ))
+                # Verificar indentación del cuerpo de la función
+                elif i < len(source_code.splitlines()):
+                    # Detectar la primera línea no vacía después de la definición de función
+                    found_body = False
+                    for j in range(i, len(source_code.splitlines())):
+                        next_line = source_code.splitlines()[j]
+                        # Ignorar líneas en blanco y comentarios
+                        if not next_line.strip() or next_line.strip().startswith('#'):
+                            continue
+                        
+                        # Verificar indentación
+                        indent = len(next_line) - len(next_line.lstrip())
+                        if indent == 0:
+                            error_handler.add_error(CompilerError(
+                                type=ErrorType.SYNTACTIC,
+                                line=j+1,
+                                message="Indentación incorrecta en el cuerpo de la función",
+                                code_line=next_line,
+                                column=0,
+                                suggestion="El cuerpo de la función debe estar indentado (usualmente con 4 espacios o un tabulador)"
+                            ))
+                        found_body = True
+                        break
+                    
+                    # Si no encontramos cuerpo de función, es probable que falte el cuerpo
+                    if not found_body:
+                        error_handler.add_error(CompilerError(
+                            type=ErrorType.SYNTACTIC,
+                            line=i,
+                            message="Falta el cuerpo de la función",
+                            code_line=line,
+                            column=len(line.rstrip()),
+                            suggestion="Añade el cuerpo de la función con la indentación correcta"
+                        ))
+        
         # Remover errores de funciones que en realidad están definidas
         error_handler.remove_function_errors(defined_functions)
         

@@ -97,6 +97,7 @@ class PLYLexer:
         # Inicializar el lexer
         self.check_unclosed_delimiters()
         self.check_invalid_characters()
+        self.check_indentation()
         
         # Variables para manejar indentación
         self.indent_stack = [0]
@@ -158,6 +159,50 @@ class PLYLexer:
                         suggestion=f"El carácter '{char}' no está permitido en el lenguaje"
                     ))
                     self.valid_code = False
+
+    def check_indentation(self):
+        """Verifica problemas de indentación en el código"""
+        in_function_def = False
+        expected_indent = 0
+        
+        for i, line in enumerate(self.source_lines, 1):
+            stripped = line.strip()
+            
+            # Ignorar líneas vacías y comentarios
+            if not stripped or stripped.startswith('#'):
+                continue
+                
+            # Calcular la indentación actual
+            current_indent = len(line) - len(line.lstrip())
+            
+            # Verificar si es una definición de función
+            if stripped.startswith('def ') and stripped.endswith(':'):
+                in_function_def = True
+                expected_indent = current_indent + 4  # Esperamos 4 espacios más
+                continue
+                
+            # Si estamos dentro de una función, verificar indentación
+            if in_function_def:
+                # Si la línea no está indentada correctamente
+                if current_indent < expected_indent:
+                    # Verificar si es una nueva definición (indicando que terminó la función anterior)
+                    if stripped.startswith('def ') or current_indent == 0:
+                        in_function_def = False
+                        expected_indent = 0
+                    else:
+                        # Error de indentación
+                        error_handler.add_error(CompilerError(
+                            type=ErrorType.SYNTACTIC,
+                            line=i,
+                            message="Indentación insuficiente",
+                            code_line=line,
+                            column=0,
+                            suggestion="Aumenta la indentación al nivel esperado (usualmente 4 espacios)"
+                        ))
+                        self.valid_code = False
+                else:
+                    # Si la indentación es correcta, podemos terminar la verificación para esta función
+                    in_function_def = False
 
     def token(self):
         """Método requerido por PLY para obtener el siguiente token"""
