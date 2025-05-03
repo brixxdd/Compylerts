@@ -519,6 +519,26 @@ class PLYParser:
         func_name = p[1]
         args = [] if len(p) == 4 else p[3]
         
+        # Verificar posibles errores de argumentos
+        if hasattr(p, 'lexer') and hasattr(p.lexer, 'last_tokens') and len(p.lexer.last_tokens) >= 2:
+            # Buscar patrón de tokens que indique coma suelta
+            last_tokens = p.lexer.last_tokens[-2:]
+            if any(t.type == 'COMMA' and p.lexer.last_tokens[-1].type == 'RPAREN' for t in last_tokens):
+                lineno = p.lineno(1) if hasattr(p, 'lineno') else 0
+                if lineno > 0 and lineno <= len(self.source_lines):
+                    line = self.source_lines[lineno - 1]
+                    comma_pos = line.rfind(',', 0, line.rfind(')'))
+                    if comma_pos != -1:
+                        error_handler.add_error(CompilerError(
+                            type=ErrorType.SYNTACTIC,
+                            line=lineno,
+                            message=f"Coma suelta en la llamada a función '{func_name}'",
+                            code_line=line,
+                            column=comma_pos,
+                            suggestion="Elimina la coma o añade otro argumento después de la coma"
+                        ))
+                        self.valid_code = False
+        
         # Manejo especial para funciones built-in como print
         if func_name in ['print', 'input', 'len']:
             p[0] = CallExpr(Identifier(func_name), args)
@@ -539,6 +559,10 @@ class PLYParser:
         # Verificar argumentos
         for arg in args:
             if isinstance(arg, Identifier):
+                if not hasattr(self, 'variables'):
+                    # Crear el atributo si no existe
+                    self.variables = set()
+                
                 if arg.name not in self.variables and arg.name not in ['True', 'False', 'None']:
                     error_handler.add_error(CompilerError(
                         type=ErrorType.SEMANTIC,
@@ -570,6 +594,36 @@ class PLYParser:
             if isinstance(value, str):
                 value = Literal(value=value, type_name='string')
             p[0] = p[1] + [value]
+    
+    # Nueva regla para detectar comas sueltas en argumentos
+    def p_arguments_trailing_comma(self, p):
+        '''arguments : arguments COMMA'''
+        # Se detectó una coma suelta al final de la lista de argumentos
+        line = p.lineno(2) if hasattr(p, 'lineno') else 0
+        if line > 0 and line <= len(self.source_lines):
+            code_line = self.source_lines[line - 1]
+            # Encontrar la posición de la coma
+            comma_pos = code_line.rfind(',')
+            
+            # En caso de que existan comas consecutivas, buscar la coma específica
+            # que está causando el error (la que está justo antes del paréntesis de cierre)
+            closing_paren_pos = code_line.find(')', comma_pos)
+            if closing_paren_pos != -1:
+                # Verificar si no hay nada significativo entre la coma y el paréntesis
+                between_text = code_line[comma_pos+1:closing_paren_pos].strip()
+                if not between_text:  # Si está vacío, es una coma suelta
+                    error_handler.add_error(CompilerError(
+                        type=ErrorType.SYNTACTIC,
+                        line=line,
+                        message="Coma suelta en argumentos de función",
+                        code_line=code_line,
+                        column=comma_pos,
+                        suggestion="Elimina la coma o añade otro argumento después de la coma"
+                    ))
+                    self.valid_code = False
+            
+        # Devolver los argumentos que ya teníamos antes de la coma
+        p[0] = p[1]
     
     # <return_type> ::= ARROW TYPE | empty
     def p_return_type(self, p):

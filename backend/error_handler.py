@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import List, Optional
+import re
 
 class ErrorType(Enum):
     LEXICAL = auto()
@@ -48,6 +49,29 @@ class ErrorHandler:
         """Limpia todos los errores acumulados"""
         self.errors = []
         self.function_advice_added = False
+    
+    def remove_function_errors(self, defined_functions):
+        """Elimina errores de 'función no definida' para funciones que están definidas"""
+        if not defined_functions:
+            return
+            
+        filtered_errors = []
+        for error in self.errors:
+            # Si es un error de función no definida, verificar si realmente está definida
+            if (error.type == ErrorType.SEMANTIC and 
+                "función" in error.message.lower() and 
+                "no está definida" in error.message.lower()):
+                # Extraer el nombre de la función del mensaje de error
+                func_match = re.search(r"'([^']+)'", error.message)
+                if func_match:
+                    func_name = func_match.group(1)
+                    # Si la función está definida, no incluir el error
+                    if func_name in defined_functions:
+                        continue
+            filtered_errors.append(error)
+        
+        # Actualizar la lista de errores
+        self.errors = filtered_errors
     
     def format_errors(self) -> str:
         if not self.errors:

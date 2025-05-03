@@ -36,6 +36,7 @@ def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
         # Pre-registrar todas las funciones definidas en el código
         # Este paso es esencial para evitar falsos errores de "función no definida"
         function_defs = {}
+        defined_functions = set()
         for i, line in enumerate(source_code.splitlines(), 1):
             stripped_line = line.strip()
             if stripped_line.startswith('def '):
@@ -44,6 +45,7 @@ def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
                     func_name = stripped_line.split()[1].split('(')[0]
                     # Registrar la función y su línea
                     function_defs[func_name] = i
+                    defined_functions.add(func_name)
                     # Añadir a las listas del parser
                     parser.user_defined_functions.add(func_name)
                     if func_name not in parser.known_functions:
@@ -51,6 +53,34 @@ def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
                     parser.function_contexts.append(func_name)
                 except:
                     pass
+                    
+        # Verificar si hay comas sueltas en el código (trailing commas)
+        # Esta es una verificación adicional específica para este error común
+        for i, line in enumerate(source_code.splitlines(), 1):
+            if '(' in line and ')' in line and ',' in line:
+                # Ignorar comentarios
+                if '#' in line:
+                    line = line.split('#')[0]
+                    
+                func_start = line.find('(')
+                func_end = line.rfind(')')
+                if func_start < func_end:
+                    args_str = line[func_start+1:func_end]
+                    # Verificar coma al final de los argumentos
+                    if args_str.strip().endswith(','):
+                        # Encontrar la posición de la coma
+                        comma_pos = line.rfind(',', func_start, func_end)
+                        error_handler.add_error(CompilerError(
+                            type=ErrorType.SYNTACTIC,
+                            line=i,
+                            message="Coma suelta en argumentos de función",
+                            code_line=line,
+                            column=comma_pos,
+                            suggestion="Elimina la coma o añade otro argumento después de la coma"
+                        ))
+        
+        # Remover errores de funciones que en realidad están definidas
+        error_handler.remove_function_errors(defined_functions)
         
         # Verificar si es código con estructuras de control
         has_control_structures = False
@@ -74,27 +104,6 @@ def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
         except Exception as e:
             # Si falla el parser, continuamos con los errores ya detectados
             ast = None
-        
-        # Filtrar errores de funciones no definidas si ya están definidas
-        if function_defs:
-            filtered_errors = []
-            for error in error_handler.errors:
-                # Si es un error de función no definida, verificar si realmente está definida
-                if (error.type == ErrorType.SEMANTIC and 
-                    "función" in error.message.lower() and 
-                    "no está definida" in error.message.lower()):
-                    # Extraer el nombre de la función del mensaje de error
-                    func_match = re.search(r"'([^']+)'", error.message)
-                    if func_match:
-                        func_name = func_match.group(1)
-                        # Si la función está definida en alguna parte del código,
-                        # y la llamada ocurre después de la definición, ignorar el error
-                        if func_name in function_defs and error.line >= function_defs[func_name]:
-                            continue
-                filtered_errors.append(error)
-            
-            # Actualizar la lista de errores
-            error_handler.errors = filtered_errors
         
         # Ahora sí, si hay errores, retornarlos
         if error_handler.has_errors():

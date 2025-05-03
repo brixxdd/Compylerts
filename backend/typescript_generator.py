@@ -261,6 +261,13 @@ class TypeScriptGenerator:
         func_name = node.callee.name
         args = [self.visit_expression(arg) for arg in node.arguments]
         
+        # Verificar si hay un argumento None o indefinido (posible indicación de coma suelta)
+        for arg in args:
+            if arg is None or arg == "undefined":
+                # Si encontramos un argumento None, es probable que sea debido a una coma suelta
+                # En este caso, es mejor no generar código para evitar errores en TypeScript
+                return f"/* Error: Posible coma suelta en llamada a {func_name} */"
+        
         # Usar la transformación para funciones built-in
         if func_name in ['print', 'len', 'str', 'int', 'float', 'list', 'sum', 'max', 'min']:
             return self.transform_python_builtin(func_name, args)
