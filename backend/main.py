@@ -53,7 +53,87 @@ def compile_to_typescript(source_code: str) -> tuple[str | None, list[str]]:
                     parser.function_contexts.append(func_name)
                 except:
                     pass
-                    
+        
+        # Verificar operaciones de tipo incompatible (int + str, etc.)
+        variables = {}  # Diccionario para rastrear variables y sus tipos
+        for i, line in enumerate(source_code.splitlines(), 1):
+            # Ignorar comentarios
+            if '#' in line:
+                line = line.split('#')[0]
+                
+            stripped_line = line.strip()
+            
+            # Detectar asignaciones para rastrear tipos
+            if '=' in stripped_line and not any(stripped_line.startswith(kw) for kw in ['if ', 'while ', 'for ']):
+                # Separar la parte izquierda y derecha de la asignación
+                parts = stripped_line.split('=', 1)
+                var_name = parts[0].strip()
+                value = parts[1].strip()
+                
+                # Inferir el tipo de la variable
+                if value.isdigit():
+                    variables[var_name] = 'int'
+                elif value.startswith('"') and value.endswith('"') or value.startswith("'") and value.endswith("'"):
+                    variables[var_name] = 'str'
+                elif value.lower() == 'true' or value.lower() == 'false':
+                    variables[var_name] = 'bool'
+                elif any(op in value for op in ['+', '-', '*', '/']):
+                    # Verificar operaciones aritméticas
+                    for op in ['+', '-', '*', '/']:
+                        if op in value:
+                            operands = value.split(op, 1)  # Dividir solo por la primera ocurrencia
+                            left = operands[0].strip()
+                            right = operands[1].strip()
+                            
+                            # Determinar tipos de los operandos
+                            left_type = None
+                            right_type = None
+                            
+                            # Tipo del operando izquierdo
+                            if left.isdigit():
+                                left_type = 'int'
+                            elif left.startswith('"') or left.startswith("'"):
+                                left_type = 'str'
+                            elif left.lower() == 'true' or left.lower() == 'false':
+                                left_type = 'bool'
+                            elif left in variables:
+                                left_type = variables[left]
+                                
+                            # Tipo del operando derecho
+                            if right.isdigit():
+                                right_type = 'int'
+                            elif right.startswith('"') or right.startswith("'"):
+                                right_type = 'str'
+                            elif right.lower() == 'true' or right.lower() == 'false':
+                                right_type = 'bool'
+                            elif right in variables:
+                                right_type = variables[right]
+                            
+                            # Verificar compatibilidad de tipos
+                            if left_type and right_type:
+                                column = line.find(op)
+                                error_handler.check_type_compatibility(
+                                    left_type, right_type, op, i, line, column
+                                )
+                                
+                                # Inferir tipo del resultado
+                                if op == '+':
+                                    # Suma
+                                    if left_type == 'int' and right_type == 'int':
+                                        variables[var_name] = 'int'
+                                    elif left_type == 'str' or right_type == 'str':
+                                        variables[var_name] = 'str'
+                                    elif left_type == 'bool' and right_type == 'int' or left_type == 'int' and right_type == 'bool':
+                                        variables[var_name] = 'int'
+                                elif op in ['-', '*', '/']:
+                                    # Resta, multiplicación, división
+                                    if left_type == 'str' or right_type == 'str':
+                                        # Error ya reportado
+                                        pass
+                                    else:
+                                        variables[var_name] = 'int' if op != '/' else 'float'
+                            break  # Solo procesamos el primer operador encontrado
+        
         # Verificar si hay comas sueltas en el código (trailing commas)
         # Esta es una verificación adicional específica para este error común
         for i, line in enumerate(source_code.splitlines(), 1):

@@ -1,21 +1,37 @@
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import List, Optional
+from typing import List, Optional, Set
 import re
 
 class ErrorType(Enum):
-    LEXICAL = auto()
-    SYNTACTIC = auto()
-    SEMANTIC = auto()
+    """Tipos de errores que puede detectar el compilador"""
+    LEXICAL = "LEXICAL"
+    SYNTACTIC = "SYNTACTIC"
+    SEMANTIC = "SEMANTIC"
+    TYPE = "TYPE"  # Nuevo tipo de error
 
 @dataclass
 class CompilerError:
-    type: ErrorType
-    line: int
-    message: str
-    code_line: str
-    column: int
-    suggestion: Optional[str] = None
+    """Clase para representar errores del compilador"""
+    
+    def __init__(self, type: ErrorType, line: int, message: str, code_line: str = "", column: int = 0, suggestion: str = ""):
+        """
+        Inicializa un error del compilador
+        
+        Args:
+            type: Tipo de error (léxico, sintáctico, semántico)
+            line: Número de línea donde ocurrió el error
+            message: Descripción del error
+            code_line: Línea de código donde ocurrió el error
+            column: Columna donde ocurrió el error
+            suggestion: Sugerencia para corregir el error
+        """
+        self.type = type
+        self.line = line
+        self.message = message
+        self.code_line = code_line
+        self.column = column
+        self.suggestion = suggestion
     
     def __eq__(self, other):
         if not isinstance(other, CompilerError):
@@ -29,84 +45,172 @@ class CompilerError:
         return hash((self.type, self.line, self.message, self.column))
 
 class ErrorHandler:
+    """Manejador de errores del compilador"""
+    
     def __init__(self):
+        """Inicializa el manejador de errores"""
         self.errors: List[CompilerError] = []
         self.function_advice_added = False
         
     def add_error(self, error: CompilerError):
-        # Evitar agregar errores duplicados
-        if error in self.errors:
-            return
-        self.errors.append(error)
+        """
+        Añade un error a la lista de errores
+        
+        Args:
+            error: Error a añadir
+        """
+        # Verificar si el error ya existe
+        if error not in self.errors:
+            self.errors.append(error)
     
     def has_errors(self) -> bool:
+        """
+        Verifica si hay errores
+        
+        Returns:
+            True si hay errores, False en caso contrario
+        """
         return len(self.errors) > 0
     
     def get_errors_by_type(self, error_type: ErrorType) -> List[CompilerError]:
-        return [e for e in self.errors if e.type == error_type]
+        """
+        Obtiene los errores de un tipo específico
+        
+        Args:
+            error_type: Tipo de error a filtrar
+            
+        Returns:
+            Lista de errores del tipo especificado
+        """
+        return [error for error in self.errors if error.type == error_type]
     
     def clear_errors(self):
-        """Limpia todos los errores acumulados"""
+        """Limpia la lista de errores"""
         self.errors = []
         self.function_advice_added = False
     
-    def remove_function_errors(self, defined_functions):
-        """Elimina errores de 'función no definida' para funciones que están definidas"""
-        if not defined_functions:
-            return
-            
-        filtered_errors = []
-        for error in self.errors:
-            # Si es un error de función no definida, verificar si realmente está definida
-            if (error.type == ErrorType.SEMANTIC and 
-                "función" in error.message.lower() and 
-                "no está definida" in error.message.lower()):
-                # Extraer el nombre de la función del mensaje de error
-                func_match = re.search(r"'([^']+)'", error.message)
-                if func_match:
-                    func_name = func_match.group(1)
-                    # Si la función está definida, no incluir el error
-                    if func_name in defined_functions:
-                        continue
-            filtered_errors.append(error)
+    def remove_function_errors(self, defined_functions: Set[str]):
+        """
+        Elimina errores relacionados con funciones que en realidad están definidas
         
-        # Actualizar la lista de errores
-        self.errors = filtered_errors
+        Args:
+            defined_functions: Conjunto de nombres de funciones definidas
+        """
+        to_remove = []
+        for i, error in enumerate(self.errors):
+            if (error.type == ErrorType.SEMANTIC and 
+                "Función '" in error.message and 
+                "' no está definida" in error.message):
+                
+                # Extraer el nombre de la función
+                func_name = error.message.split("'")[1]
+                if func_name in defined_functions:
+                    to_remove.append(i)
+        
+        # Eliminar los errores de atrás hacia adelante para no afectar los índices
+        for i in sorted(to_remove, reverse=True):
+            self.errors.pop(i)
+    
+    def check_type_compatibility(self, left_type: str, right_type: str, operation: str, line: int, code_line: str, column: int):
+        """
+        Verifica si dos tipos son compatibles para una operación
+        
+        Args:
+            left_type: Tipo del operando izquierdo
+            right_type: Tipo del operando derecho
+            operation: Operación que se está realizando
+            line: Número de línea donde ocurre la operación
+            code_line: Línea de código donde ocurre la operación
+            column: Columna donde ocurre la operación
+        
+        Returns:
+            True si los tipos son compatibles, False en caso contrario
+        """
+        # Para la operación de suma
+        if operation == '+':
+            # Verificar tipos incompatibles para suma
+            incompatible_types = {
+                ('int', 'str'): "No se puede sumar un entero con un string",
+                ('str', 'int'): "No se puede sumar un string con un entero",
+                ('bool', 'str'): "No se puede sumar un booleano con un string",
+                ('str', 'bool'): "No se puede sumar un string con un booleano",
+            }
+            
+            key = (left_type, right_type)
+            if key in incompatible_types:
+                self.add_error(CompilerError(
+                    type=ErrorType.TYPE,
+                    line=line,
+                    message=f"Error de tipo: {incompatible_types[key]}",
+                    code_line=code_line,
+                    column=column,
+                    suggestion=f"Convierte los tipos manualmente antes de operarlos: str({left_type})" if left_type != 'str' else f"Convierte los tipos manualmente antes de operarlos: str({right_type})"
+                ))
+                return False
+        
+        # Para la operación de resta, multiplicación y división
+        elif operation in ['-', '*', '/']:
+            # Verificar incompatibilidades para otras operaciones aritméticas
+            if left_type == 'str' or right_type == 'str':
+                operation_names = {'-': 'restar', '*': 'multiplicar', '/': 'dividir'}
+                self.add_error(CompilerError(
+                    type=ErrorType.TYPE,
+                    line=line,
+                    message=f"Error de tipo: No se puede {operation_names[operation]} un string",
+                    code_line=code_line,
+                    column=column,
+                    suggestion=f"Las operaciones aritméticas '{operation}' no se pueden realizar con strings"
+                ))
+                return False
+        
+        return True
     
     def format_errors(self) -> str:
+        """
+        Formatea los errores para mostrarlos al usuario
+        
+        Returns:
+            Errores formateados como string
+        """
         if not self.errors:
-            return ""
+            return "No se encontraron errores."
         
-        # Asegurarnos de que no hay duplicados
-        unique_errors = set()
+        # Ordenar errores por tipo y línea
+        self.errors.sort(key=lambda e: (e.type.value, e.line))
+        
+        # Agrupar por tipo
+        error_by_type = {}
         for error in self.errors:
-            unique_errors.add(error)
+            if error.type not in error_by_type:
+                error_by_type[error.type] = []
+            error_by_type[error.type].append(error)
         
-        # Convertir a lista y ordenar
-        unique_errors_list = list(unique_errors)
-        unique_errors_list.sort(key=lambda x: (x.type.value, x.line))
+        result = "\n❌ Errores encontrados:\n"
         
-        output = ["❌ Errores encontrados:"]
-        
-        # Procesar errores por tipo
-        for error_type in ErrorType:
-            type_errors = [e for e in unique_errors_list if e.type == error_type]
-            if type_errors:
-                output.append(f"\n{error_type.name}:")
-                for error in type_errors:
-                    output.append(f"  Línea {error.line}: {error.message}")
-                    output.append(f"  En el código:")
-                    output.append(f"      {error.code_line}")
-                    output.append(f"      {' ' * error.column}^ Aquí")
-                    if error.suggestion:
-                        output.append(f"  Sugerencia: {error.suggestion}")
+        for error_type, errors in error_by_type.items():
+            result += f"\n{error_type.value}:\n"
+            for error in errors:
+                # Añadir información de línea y mensaje
+                result += f"  Línea {error.line}: {error.message}\n"
+                
+                # Añadir la línea de código si está disponible
+                if error.code_line:
+                    result += f"  En el código:\n      {error.code_line}\n"
+                    
+                    # Añadir marcador que apunte al error
+                    if error.column >= 0:
+                        result += f"      {' ' * error.column}^ Aquí\n"
+                
+                # Añadir sugerencia si está disponible
+                if error.suggestion:
+                    result += f"  Sugerencia: {error.suggestion}\n"
         
         # Agregar consejos para errores comunes (solo una vez)
-        if any(e.type == ErrorType.SEMANTIC and "función" in e.message.lower() for e in unique_errors_list):
-            output.append("\nConsejo: Asegúrate de que todas las funciones que usas estén definidas antes de llamarlas.")
+        if any(e.type == ErrorType.SEMANTIC and "función" in e.message.lower() for e in self.errors):
+            result += "\nConsejo: Asegúrate de que todas las funciones que usas estén definidas antes de llamarlas."
             self.function_advice_added = True
         
-        return "\n".join(output)
+        return result
 
-# Singleton para el manejador de errores
+# Crear una instancia global del manejador de errores
 error_handler = ErrorHandler() 
